@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { GoogleGenAI } from "@google/genai";
 import { Shot, ClubStats } from '../types';
-import { Sparkles, Activity, Loader2, Quote, AlertCircle, Target, TrendingUp, Info, BrainCircuit, ShieldAlert } from 'lucide-react';
+import { Sparkles, Activity, Loader2, Quote, AlertCircle, Target, TrendingUp, Info, BrainCircuit } from 'lucide-react';
 
 interface SessionCoachProps {
   activeShots: Shot[];
@@ -56,7 +56,7 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
 
   const runAnalysis = async () => {
     if (activeShots.length < 5) {
-      setError("Strategic analysis requires at least 5 shots for a pattern detection.");
+      setError("Strategic analysis requires at least 5 shots for a credible pattern detection.");
       return;
     }
 
@@ -64,19 +64,9 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
     setError(null);
 
     try {
-      // Robust key detection for mobile browsers
-      let apiKey = '';
-      try {
-        apiKey = process.env.API_KEY || '';
-      } catch (e) {
-        apiKey = (window as any).process?.env?.API_KEY || '';
-      }
-
-      if (!apiKey) {
-        throw new Error("API_KEY is not defined. Please verify that 'API_KEY' is added to your Environment Variables (e.g., in the Vercel Dashboard).");
-      }
-
-      const ai = new GoogleGenAI({ apiKey });
+      // Use the environment variable directly as required.
+      // In many web environments, this literal string is replaced during the build/deploy step.
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       const dataSnapshot = clubStats.map(s => ({
         club: s.club,
@@ -94,11 +84,11 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
         DATA:
         ${JSON.stringify(dataSnapshot, null, 2)}
 
-        Provide report in TWO parts:
-        Part 1: [BAG-WIDE DISPERSION] - Identify macro patterns across the set.
-        Part 2: [STRATEGIC RECOMMENDATIONS] - Identify safest vs riskiest clubs and tactical focus.
+        Provide a strategic "Strategy Lab" report in TWO parts:
+        Part 1: [BAG-WIDE DISPERSION] - Macro patterns and gapping issues.
+        Part 2: [STRATEGIC RECOMMENDATIONS] - Safest vs Riskiest clubs and one tactical focus.
         
-        RULES: No # headers, use bracketed tags, bold key terms with **text**.
+        RULES: No # headers, use bracketed tags, bold key technical terms with **text**.
       `;
 
       const response = await ai.models.generateContent({
@@ -109,7 +99,7 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
       setAnalysis(response.text || "Strategic intel unavailable.");
     } catch (err: any) {
       console.error("Strategy Analysis Failure:", err);
-      setError(err.message || "Unknown error during intelligence deployment.");
+      setError(err.message || "An unexpected error occurred during intelligence deployment.");
     } finally {
       setLoading(false);
     }
@@ -131,6 +121,7 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* Sidebar - Data Context */}
       <div className="lg:col-span-4 space-y-6">
         <div className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 shadow-2xl">
           <div className="flex items-center gap-3 mb-8">
@@ -159,12 +150,13 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
                <Info size={14} className="text-zinc-500" />
              </div>
              <p className="text-[10px] font-medium leading-relaxed text-zinc-500 italic">
-               The Strategy Lab analyzes cross-club correlations and dispersion patterns to provide technical guidance.
+               The Strategy Lab analyzes cross-club correlations and dispersion patterns to provide macro-level technical guidance.
              </p>
           </div>
         </div>
       </div>
 
+      {/* Main Panel - Analysis Results */}
       <div className="lg:col-span-8">
         <div className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] overflow-hidden shadow-2xl relative min-h-[600px] flex flex-col">
           <div className="absolute top-0 right-0 p-12 opacity-[0.03] pointer-events-none">
@@ -196,11 +188,8 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
 
           <div className="p-10 flex-1">
             {error && (
-              <div className="bg-rose-500/5 border border-rose-500/20 text-rose-400 p-8 rounded-3xl text-xs font-bold flex flex-col gap-4 mb-8">
-                <div className="flex items-center gap-3">
-                  <ShieldAlert size={20} className="text-rose-500" />
-                  <span className="uppercase tracking-widest font-black text-[10px]">System Configuration Required</span>
-                </div>
+              <div className="bg-rose-500/5 border border-rose-500/20 text-rose-400 p-8 rounded-3xl text-sm font-bold flex items-center gap-4 mb-8">
+                <AlertCircle size={24} />
                 <p className="leading-relaxed opacity-80">{error}</p>
               </div>
             )}
@@ -211,6 +200,7 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
                    <Activity size={32} className="text-zinc-800" />
                 </div>
                 <h3 className="text-xl font-black uppercase tracking-tight text-zinc-600">Analysis Engine Standby</h3>
+                <p className="text-sm text-zinc-500 mt-2 font-medium">Click "Deploy Intelligence" to begin the macro bag audit.</p>
               </div>
             )}
 
@@ -218,12 +208,16 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
               <div className="grid grid-cols-1 md:grid-cols-2 gap-12 py-8">
                 <div className="space-y-6">
                   <div className="h-4 w-48 bg-zinc-800 rounded-full animate-pulse" />
-                  <div className="h-3 w-full bg-zinc-800/50 rounded-full animate-pulse" />
-                  <div className="h-3 w-11/12 bg-zinc-800/50 rounded-full animate-pulse" />
+                  <div className="space-y-3">
+                    <div className="h-3 w-full bg-zinc-800/50 rounded-full animate-pulse" />
+                    <div className="h-3 w-11/12 bg-zinc-800/50 rounded-full animate-pulse" />
+                  </div>
                 </div>
                 <div className="space-y-6">
                   <div className="h-4 w-48 bg-zinc-800 rounded-full animate-pulse" />
-                  <div className="h-3 w-full bg-zinc-800/50 rounded-full animate-pulse" />
+                  <div className="space-y-3">
+                    <div className="h-3 w-full bg-zinc-800/50 rounded-full animate-pulse" />
+                  </div>
                 </div>
               </div>
             )}
@@ -232,7 +226,9 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
               <div className="grid grid-cols-1 md:grid-cols-2 gap-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
                 <div className="space-y-8">
                   <div className="flex items-center gap-4">
-                    <h3 className="text-[11px] font-black text-emerald-500 uppercase tracking-[0.4em] whitespace-nowrap">Dispersion Audit</h3>
+                    <h3 className="text-[11px] font-black text-emerald-500 uppercase tracking-[0.4em] whitespace-nowrap">
+                      Dispersion Audit
+                    </h3>
                     <div className="h-px w-full bg-gradient-to-r from-emerald-500/20 to-transparent" />
                   </div>
                   <div className="bg-zinc-950/40 p-8 rounded-[2.5rem] border border-zinc-800/50 shadow-inner relative overflow-hidden group">
@@ -243,7 +239,9 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
 
                 <div className="space-y-8">
                   <div className="flex items-center gap-4">
-                    <h3 className="text-[11px] font-black text-blue-400 uppercase tracking-[0.4em] whitespace-nowrap">Strategy Intel</h3>
+                    <h3 className="text-[11px] font-black text-blue-400 uppercase tracking-[0.4em] whitespace-nowrap">
+                      Strategy Intel
+                    </h3>
                     <div className="h-px w-full bg-gradient-to-r from-blue-500/20 to-transparent" />
                   </div>
                   <div className="bg-zinc-950/40 p-8 rounded-[2.5rem] border border-zinc-800/50 shadow-inner relative overflow-hidden group">
