@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { Shot, ClubStats } from '../types';
 import { analyzeSessionStrategically } from '../utils/heuristicCoach';
-import { Sparkles, Activity, Loader2, Quote, AlertCircle, Target, TrendingUp, Info, BrainCircuit } from 'lucide-react';
+import { Sparkles, Activity, Loader2, Quote, Target, Info, BrainCircuit } from 'lucide-react';
 
 interface SessionCoachProps {
   activeShots: Shot[];
@@ -55,7 +55,7 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
 
   const runAnalysis = () => {
     setLoading(true);
-    // Simulate a brief "calculation" delay for UX
+    // Local calculation, simulated delay for "high-tech" feel
     setTimeout(() => {
       const result = analyzeSessionStrategically(clubStats);
       setAnalysis(result);
@@ -86,8 +86,8 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
               <Target size={20} className="text-emerald-500" />
             </div>
             <div>
-              <h3 className="text-xs font-black uppercase tracking-widest text-zinc-100">Analytics Engine</h3>
-              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">Rule-Based Diagnostic</p>
+              <h3 className="text-xs font-black uppercase tracking-widest text-zinc-100">Local Engine</h3>
+              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">Offline Diagnostics</p>
             </div>
           </div>
 
@@ -107,7 +107,7 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
                <Info size={14} />
              </div>
              <p className="text-[10px] font-medium leading-relaxed text-zinc-500 italic">
-               This diagnostic identifies gapping overlaps and macros patterns using local physics-based rules. No external API required.
+               The Strategy Lab uses physics-based heuristics to identify gapping overlaps and session patterns. No API key or cloud connection is required.
              </p>
           </div>
         </div>
