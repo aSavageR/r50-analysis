@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
-import { GoogleGenAI } from "@google/genai";
 import { ClubStats } from '../types';
-import { Sparkles, BrainCircuit, Loader2, Target, AlertCircle } from 'lucide-react';
+import { analyzeClubTactically } from '../utils/heuristicCoach';
+import { Sparkles, BrainCircuit, Loader2, Target, Info } from 'lucide-react';
 
 interface ClubCoachProps {
   stats: ClubStats;
@@ -51,58 +51,24 @@ const renderLineWithBold = (text: string) => {
 const ClubCoach: React.FC<ClubCoachProps> = ({ stats }) => {
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const runAnalysis = async () => {
+  const runAnalysis = () => {
     setLoading(true);
-    setError(null);
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      
-      const clubData = {
-        club: stats.club,
-        avgCarry: stats.averages.carryDistance.toFixed(1),
-        avgSpin: stats.averages.spinRate.toFixed(0),
-        avgLaunch: stats.averages.launchAngle.toFixed(1),
-        avgSideSpin: stats.averages.sideSpin.toFixed(0),
-        avgOffline: stats.averages.offline.toFixed(1),
-        consistency: (100 - (stats.highs.carryDistance - stats.lows.carryDistance) / stats.averages.carryDistance * 100).toFixed(0)
-      };
-
-      const prompt = `
-        Analyze ${stats.club} performance. Provide report in TWO parts:
-        Part 1: [LAUNCH OPTIMIZATION] - Spin/Launch window efficiency.
-        Part 2: [MECHANICAL FIX] - Face/Path faults and a single "feel" or drill.
-        RULES: No headers, use bracketed tags, bold technical terms with **text**.
-      `;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-      });
-
-      setAnalysis(response.text || "Tactical intel unavailable.");
-    } catch (err: any) {
-      console.error("Club Analysis Failure:", err);
-      setError(err.message || "Consultation interrupted.");
-    } finally {
+    setTimeout(() => {
+      const result = analyzeClubTactically(stats);
+      setAnalysis(result);
       setLoading(false);
-    }
+    }, 400);
   };
 
   const sections = useMemo(() => {
     if (!analysis) return [];
-    
     const getBlock = (tag: string, nextTag?: string) => {
       const regex = new RegExp(`\\[?${tag}\\]?([\\s\\S]*?)(?=\\[?${nextTag}\\]?|$)`, 'i');
       const match = analysis.match(regex);
       return match ? match[1].trim() : null;
     };
-
-    const s1 = getBlock('LAUNCH OPTIMIZATION', 'MECHANICAL FIX');
-    const s2 = getBlock('MECHANICAL FIX');
-
-    return [s1, s2].filter((s): s is string => !!s);
+    return [getBlock('LAUNCH OPTIMIZATION', 'MECHANICAL FIX'), getBlock('MECHANICAL FIX')].filter((s): s is string => !!s);
   }, [analysis]);
 
   return (
@@ -113,8 +79,8 @@ const ClubCoach: React.FC<ClubCoachProps> = ({ stats }) => {
             <BrainCircuit size={18} className="text-blue-400" />
           </div>
           <div>
-            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-100">Tactical Consultant</h3>
-            <p className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest mt-0.5">Club-Specific AI Coach</p>
+            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-100">Tactical Engine</h3>
+            <p className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest mt-0.5">Local Diagnostics</p>
           </div>
         </div>
         <button 
@@ -123,21 +89,22 @@ const ClubCoach: React.FC<ClubCoachProps> = ({ stats }) => {
           className="group relative flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
         >
           {loading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-          <span>{loading ? 'Consulting...' : 'Get Tactical Intel'}</span>
+          <span>{loading ? 'Analyzing...' : 'Get Intel'}</span>
         </button>
       </div>
 
       <div className="p-8">
-        {error && (
-          <div className="flex items-center gap-3 text-rose-400 text-[10px] font-black uppercase tracking-widest bg-rose-500/5 p-4 rounded-xl border border-rose-500/20 mb-4">
-            <AlertCircle size={14} /> {error}
+        {!analysis && !loading && (
+          <div className="flex flex-col items-center justify-center py-6 text-zinc-600 gap-3 border border-dashed border-zinc-800 rounded-2xl">
+            <Target size={24} className="opacity-20" />
+            <p className="text-[10px] font-black uppercase tracking-widest text-center px-6">Ready to audit your {stats.club} mechanics locally.</p>
           </div>
         )}
 
-        {!analysis && !loading && !error && (
-          <div className="flex flex-col items-center justify-center py-6 text-zinc-600 gap-3 border border-dashed border-zinc-800 rounded-2xl">
-            <Target size={24} className="opacity-20" />
-            <p className="text-[10px] font-black uppercase tracking-widest text-center px-6">Ready to break down your {stats.club} mechanics.</p>
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-10 gap-3">
+            <Loader2 size={24} className="animate-spin text-blue-500" />
+            <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Processing Physics Model...</span>
           </div>
         )}
 
@@ -147,7 +114,7 @@ const ClubCoach: React.FC<ClubCoachProps> = ({ stats }) => {
               <div key={idx} className="space-y-4">
                 <div className="flex items-center gap-3">
                   <h4 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] whitespace-nowrap">
-                    {idx === 0 ? 'Performance Analysis' : 'Correction Plan'}
+                    {idx === 0 ? 'Launch Analysis' : 'Tactical Plan'}
                   </h4>
                   <div className="h-px w-full bg-zinc-800/50" />
                 </div>
