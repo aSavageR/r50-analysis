@@ -46,8 +46,13 @@ export const processCsvRows = (rows: any[], sessionId: string): Shot[] => {
       const ballSpeed = parseFloat(row['Ball Speed'] || '0');
       const carryDistance = parseFloat(row['Carry Distance'] || '0');
 
-      // Basic data validity check
-      if (!club || isNaN(ballSpeed) || isNaN(carryDistance) || (ballSpeed === 0 && carryDistance === 0)) {
+      /**
+       * PHYSICAL SANITY FILTER:
+       * 1. Must have a valid club.
+       * 2. Carry distance must be >= 10 yards. 0-yard shots are usually failed sensor reads or total duffs.
+       * 3. Ball speed must be >= 20 mph. Practice swings or chips shouldn't skew full-swing analytics.
+       */
+      if (!club || isNaN(ballSpeed) || isNaN(carryDistance) || carryDistance < 10 || ballSpeed < 20) {
         return null;
       }
 
@@ -89,39 +94,41 @@ export const processCsvRows = (rows: any[], sessionId: string): Shot[] => {
 };
 
 /**
- * Enhanced outlier filtering.
- * Uses a two-stage approach:
- * 1. Percentile Trim: Removes the bottom 10% and top 5% of shots by carry (highly effective for launch monitor data).
- * 2. Tight IQR: Uses a 1.0 multiplier (stricter than the standard 1.5) to find the core data cluster.
+ * ULTRA-AGGRESSIVE OUTLIER FILTERING:
+ * Designed to find the 'True Cluster' of a golfer's strike.
  */
 export const filterOutliers = (shots: Shot[]): Shot[] => {
-  if (shots.length < 5) return shots;
+  if (shots.length < 4) return shots;
 
   // Initial sort by carry distance to identify extreme mishits
   const sortedByCarry = [...shots].sort((a, b) => a.carryDistance - b.carryDistance);
   
-  // Stage 1: Aggressive Percentile Trim
-  // Removes bottom 10% (duffs/topped) and top 5% (glitch/wind reads)
-  const start = Math.floor(shots.length * 0.1);
-  const end = Math.ceil(shots.length * 0.95);
+  /**
+   * STAGE 1: Broad Percentile Trim (Aggressive)
+   * We remove the bottom 15% (duffs/topped) and top 10% (glitch/fliers).
+   * This removes a total of 25% of data before the core calculation.
+   */
+  const start = Math.floor(shots.length * 0.15);
+  const end = Math.ceil(shots.length * 0.90);
   const trimmed = sortedByCarry.slice(start, end);
 
-  if (trimmed.length < 3) return shots;
+  if (trimmed.length < 2) return shots;
 
-  // Stage 2: Tight Interquartile Range (IQR) Filter
-  // Multiplier reduced from 1.5 to 1.0 for a significantly higher removal percentage
+  /**
+   * STAGE 2: Ultra-Tight Interquartile Range (IQR) Filter
+   * Multiplier reduced to 0.75x. This is extremely strict and will only keep 
+   * shots that are very close to the median performance.
+   */
   const values = trimmed.map(s => s.carryDistance).sort((a, b) => a - b);
   const q1 = values[Math.floor(values.length * 0.25)];
   const q3 = values[Math.floor(values.length * 0.75)];
   const iqr = q3 - q1;
-  const lowerBound = q1 - 1.0 * iqr;
-  const upperBound = q3 + 1.0 * iqr;
+  const lowerBound = q1 - 0.75 * iqr;
+  const upperBound = q3 + 0.75 * iqr;
 
-  // Return the data that fits in the tightest cluster, ensuring no total duffs (under 10yds)
   return trimmed.filter(s => 
     s.carryDistance >= lowerBound && 
-    s.carryDistance <= upperBound &&
-    s.carryDistance > 10
+    s.carryDistance <= upperBound
   );
 };
 
