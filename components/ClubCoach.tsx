@@ -57,8 +57,14 @@ const ClubCoach: React.FC<ClubCoachProps> = ({ stats }) => {
     setLoading(true);
     setError(null);
     try {
-      const apiKey = typeof process !== 'undefined' ? process.env.API_KEY : undefined;
-      const ai = new GoogleGenAI({ apiKey: apiKey as string });
+      // Re-create AI instance right before making an API call
+      const apiKey = process.env.API_KEY;
+      
+      if (!apiKey || apiKey === "REPLACE_WITH_YOUR_API_KEY") {
+        throw new Error("Missing API Key.");
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
       
       const clubData = {
         club: stats.club,
@@ -85,10 +91,18 @@ const ClubCoach: React.FC<ClubCoachProps> = ({ stats }) => {
         contents: prompt,
       });
 
-      setAnalysis(response.text || "Tactical intel unavailable.");
+      if (!response.text) throw new Error("Empty AI response.");
+
+      setAnalysis(response.text);
     } catch (err: any) {
-      console.error("AI Consultation Failure:", err);
-      setError("AI unavailable. Check API key settings.");
+      console.error("Club Coach Error:", err);
+      let message = "Engine Error: ";
+      if (err.message?.includes("401") || err.message?.includes("API Key")) {
+        message = "Auth Error. Check Key.";
+      } else {
+        message = err.message || "Failed to connect.";
+      }
+      setError(message);
     } finally {
       setLoading(false);
     }

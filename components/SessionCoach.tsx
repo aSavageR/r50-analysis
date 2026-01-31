@@ -64,9 +64,15 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
     setError(null);
 
     try {
-      // Accessing process.env safely to avoid load-time ReferenceErrors
-      const apiKey = typeof process !== 'undefined' ? process.env.API_KEY : undefined;
-      const ai = new GoogleGenAI({ apiKey: apiKey as string });
+      // Re-create AI instance right before making an API call to ensure 
+      // it always uses the most up-to-date API key from the environment/dialog.
+      const apiKey = process.env.API_KEY;
+      
+      if (!apiKey || apiKey === "REPLACE_WITH_YOUR_API_KEY") {
+        throw new Error("API Key not found. Please click the 'Connect' button or check Vercel settings.");
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
       
       const dataSnapshot = clubStats.map(s => ({
         club: s.club,
@@ -97,10 +103,22 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
         contents: prompt,
       });
 
-      setAnalysis(response.text || "Strategic engine returned no data.");
+      if (!response.text) {
+        throw new Error("The AI model returned an empty response.");
+      }
+
+      setAnalysis(response.text);
     } catch (err: any) {
-      console.error("AI Deployment Failure:", err);
-      setError("AI Engine Offline. Ensure your API Key is valid and accessible.");
+      console.error("Gemini AI Error:", err);
+      let message = "AI Error: ";
+      if (err.message?.includes("401") || err.message?.includes("API Key")) {
+        message += "Authorization issue. Re-connect your key.";
+      } else if (err.message?.includes("403")) {
+        message += "Access Denied. Check API billing/region.";
+      } else {
+        message += err.message || "Unknown error connecting to Gemini.";
+      }
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -130,7 +148,7 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
             </div>
             <div>
               <h3 className="text-xs font-black uppercase tracking-widest text-zinc-100">AI Intelligence</h3>
-              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">Gemini 3 Pro Engine</p>
+              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">Gemini 3 Flash Engine</p>
             </div>
           </div>
 
@@ -187,9 +205,12 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
 
           <div className="p-10 flex-1">
             {error && (
-              <div className="flex items-center gap-4 p-6 bg-rose-500/5 border border-rose-500/20 rounded-3xl text-rose-400">
-                <AlertCircle size={24} />
-                <p className="text-sm font-bold uppercase tracking-widest">{error}</p>
+              <div className="flex items-start gap-4 p-6 bg-rose-500/5 border border-rose-500/20 rounded-3xl text-rose-400">
+                <AlertCircle size={20} className="mt-1 flex-shrink-0" />
+                <div className="space-y-1">
+                  <p className="text-sm font-black uppercase tracking-widest">Initialization Error</p>
+                  <p className="text-xs font-medium opacity-80">{error}</p>
+                </div>
               </div>
             )}
 
