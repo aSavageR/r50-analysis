@@ -61,7 +61,8 @@ const ClubCoach: React.FC<ClubCoachProps> = ({ stats }) => {
       const apiKey = process.env.API_KEY; 
       if (!apiKey) throw new Error("API configuration missing.");
 
-      const ai = new GoogleGenAI({ apiKey });
+      // Always use the required instantiation pattern with named parameter.
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       const clubData = {
         club: stats.club,
