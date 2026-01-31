@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
+import { GoogleGenAI } from "@google/genai";
 import { Shot, ClubStats } from '../types';
-import { analyzeSessionStrategically } from '../utils/heuristicCoach';
-import { Sparkles, Activity, Loader2, Quote, Target, Info, BrainCircuit } from 'lucide-react';
+import { Sparkles, Activity, Loader2, Quote, AlertCircle, Target, Info, BrainCircuit } from 'lucide-react';
 
 interface SessionCoachProps {
   activeShots: Shot[];
@@ -52,15 +52,58 @@ const renderLineWithBold = (text: string) => {
 const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) => {
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const runAnalysis = () => {
+  const runAnalysis = async () => {
+    if (activeShots.length < 3) {
+      setError("Strategic analysis requires more data points. Hit more shots to build a profile.");
+      return;
+    }
+
     setLoading(true);
-    // Local calculation, simulated delay for "high-tech" feel
-    setTimeout(() => {
-      const result = analyzeSessionStrategically(clubStats);
-      setAnalysis(result);
+    setError(null);
+
+    try {
+      // Accessing process.env safely to avoid load-time ReferenceErrors
+      const apiKey = typeof process !== 'undefined' ? process.env.API_KEY : undefined;
+      const ai = new GoogleGenAI({ apiKey: apiKey as string });
+      
+      const dataSnapshot = clubStats.map(s => ({
+        club: s.club,
+        shots: s.count,
+        avgCarry: s.averages.carryDistance.toFixed(1),
+        avgSpin: s.averages.spinRate.toFixed(0),
+        avgLaunch: s.averages.launchAngle.toFixed(1),
+        avgOffline: s.averages.offline.toFixed(1),
+        dispersion: (s.highs.carryDistance - s.lows.carryDistance).toFixed(1)
+      }));
+
+      const prompt = `
+        Role: PGA Tour Data Analyst
+        Context: Analyzing a full practice session from a Garmin R50 Launch Monitor.
+        Data: ${JSON.stringify(dataSnapshot)}
+
+        Task: Provide a high-level strategic "Bag Audit".
+        
+        Structure:
+        [BAG-WIDE DISPERSION] - Analyze gapping overlaps and overall dispersion trends.
+        [STRATEGIC RECOMMENDATIONS] - Identify the "Reliability Score" for each club group and one tactical range focus.
+        
+        Rules: Professional tone, no # markdown headers, use the bracketed tags above, bold key technical concepts.
+      `;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: prompt,
+      });
+
+      setAnalysis(response.text || "Strategic engine returned no data.");
+    } catch (err: any) {
+      console.error("AI Deployment Failure:", err);
+      setError("AI Engine Offline. Ensure your API Key is valid and accessible.");
+    } finally {
       setLoading(false);
-    }, 600);
+    }
   };
 
   const sections = useMemo(() => {
@@ -86,8 +129,8 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
               <Target size={20} className="text-emerald-500" />
             </div>
             <div>
-              <h3 className="text-xs font-black uppercase tracking-widest text-zinc-100">Local Engine</h3>
-              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">Offline Diagnostics</p>
+              <h3 className="text-xs font-black uppercase tracking-widest text-zinc-100">AI Intelligence</h3>
+              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">Gemini 3 Pro Engine</p>
             </div>
           </div>
 
@@ -97,7 +140,7 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
               <span className="text-lg font-black mono text-emerald-400">{activeShots.length}</span>
             </div>
             <div className="flex justify-between items-center p-4 bg-zinc-950 rounded-2xl border border-zinc-800">
-              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Clubs Tested</span>
+              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Clubs Analyzed</span>
               <span className="text-lg font-black mono text-blue-400">{clubStats.length}</span>
             </div>
           </div>
@@ -107,7 +150,7 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
                <Info size={14} />
              </div>
              <p className="text-[10px] font-medium leading-relaxed text-zinc-500 italic">
-               The Strategy Lab uses physics-based heuristics to identify gapping overlaps and session patterns. No API key or cloud connection is required.
+               The Strategy Lab correlates your entire session to find subtle gapping and dispersion faults using advanced generative AI.
              </p>
           </div>
         </div>
@@ -138,26 +181,37 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
               className="relative group flex items-center justify-center gap-4 bg-white hover:bg-emerald-50 text-zinc-950 px-12 py-6 rounded-2xl font-black text-sm uppercase tracking-[0.15em] transition-all active:scale-95 disabled:opacity-50 shadow-2xl"
             >
               {loading ? <Loader2 className="animate-spin" size={24} /> : <Sparkles size={24} className="text-emerald-600" />}
-              <span>{loading ? 'Processing...' : 'Run Analysis'}</span>
+              <span>{loading ? 'Consulting AI...' : 'Deploy Intelligence'}</span>
             </button>
           </div>
 
           <div className="p-10 flex-1">
-            {!analysis && !loading && (
+            {error && (
+              <div className="flex items-center gap-4 p-6 bg-rose-500/5 border border-rose-500/20 rounded-3xl text-rose-400">
+                <AlertCircle size={24} />
+                <p className="text-sm font-bold uppercase tracking-widest">{error}</p>
+              </div>
+            )}
+
+            {!analysis && !loading && !error && (
               <div className="h-full flex flex-col items-center justify-center py-24 text-center">
                 <div className="w-20 h-20 rounded-full border-2 border-dashed border-zinc-800 flex items-center justify-center mb-6">
                    <Activity size={32} className="text-zinc-800" />
                 </div>
-                <h3 className="text-xl font-black uppercase tracking-tight text-zinc-600">Engine Ready</h3>
-                <p className="text-sm text-zinc-500 mt-2 font-medium">Click "Run Analysis" to perform a local diagnostic of your session.</p>
+                <h3 className="text-xl font-black uppercase tracking-tight text-zinc-600">Intelligence Standby</h3>
+                <p className="text-sm text-zinc-500 mt-2 font-medium">Click "Deploy Intelligence" to initiate the generative session audit.</p>
               </div>
             )}
 
             {loading && (
-              <div className="flex items-center justify-center h-full">
-                <div className="flex flex-col items-center gap-4">
-                  <Loader2 className="animate-spin text-emerald-500" size={40} />
-                  <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Calculating Bag Dynamics...</span>
+              <div className="flex flex-col items-center justify-center h-full gap-6">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-emerald-500/20 blur-2xl rounded-full animate-pulse" />
+                  <Loader2 className="animate-spin text-emerald-500 relative" size={48} />
+                </div>
+                <div className="text-center">
+                  <span className="text-[10px] font-black uppercase tracking-[0.4em] text-emerald-500 block mb-2">Analyzing Bag Physics</span>
+                  <span className="text-sm text-zinc-500 font-medium italic">Gemini is processing your launch patterns...</span>
                 </div>
               </div>
             )}
