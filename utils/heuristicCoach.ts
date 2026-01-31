@@ -1,78 +1,99 @@
 
 import { Shot, ClubStats } from '../types';
 
+// PGA Tour Averages for Comparison
+const PGA_BENCHMARKS: Record<string, { carry: number, spin: number, smash: number, apex: number, ballSpeed: number, landArea: number }> = {
+  'Driver': { carry: 275, ballSpeed: 167, spin: 2500, smash: 1.48, apex: 95, landArea: 800 },
+  '3W': { carry: 243, ballSpeed: 158, spin: 3600, smash: 1.46, apex: 92, landArea: 650 },
+  '5W': { carry: 230, ballSpeed: 152, spin: 4300, smash: 1.45, apex: 95, landArea: 600 },
+  '3I': { carry: 212, ballSpeed: 142, spin: 4600, smash: 1.43, apex: 88, landArea: 550 },
+  '4I': { carry: 203, ballSpeed: 137, spin: 4800, smash: 1.42, apex: 85, landArea: 500 },
+  '5I': { carry: 194, ballSpeed: 132, spin: 5300, smash: 1.41, apex: 82, landArea: 450 },
+  '6I': { carry: 183, ballSpeed: 127, spin: 6100, smash: 1.38, apex: 80, landArea: 400 },
+  '7I': { carry: 172, ballSpeed: 120, spin: 7000, smash: 1.33, apex: 78, landArea: 350 },
+  '8I': { carry: 160, ballSpeed: 115, spin: 7900, smash: 1.32, apex: 75, landArea: 300 },
+  '9I': { carry: 148, ballSpeed: 109, spin: 8500, smash: 1.28, apex: 72, landArea: 250 },
+  'PW': { carry: 136, ballSpeed: 102, spin: 9300, smash: 1.23, apex: 68, landArea: 200 },
+};
+
 export const analyzeClubTactically = (stats: ClubStats): string => {
-  const { averages, club } = stats;
-  let report = "[LAUNCH OPTIMIZATION]\n";
+  const { averages, club, highs, lows } = stats;
+  const benchmark = PGA_BENCHMARKS[club];
+  
+  let report = "[GROUPING & DISPERSION]\n";
 
-  // Smash Factor Logic
-  const isDriver = club.toLowerCase().includes('driver');
-  const isWedge = club.toLowerCase().includes('w');
-  const isIron = club.toLowerCase().includes('i') || (!isDriver && !isWedge);
-
-  if (isDriver && averages.ballSpeed / (averages.clubSpeed || 1) < 1.42) {
-    report += "- **Smash Factor is sub-optimal**. You are likely missing the center of the face, costing you 10-15 yards.\n";
-  } else if (isIron && averages.ballSpeed / (averages.clubSpeed || 1) < 1.3) {
-    report += "- **Strike Efficiency is low**. Focus on a more centered strike to stabilize carry distances.\n";
-  } else {
-    report += "- **Efficiency looks solid**. Your speed-to-distance conversion is within the professional window.\n";
+  // Dispersion Area Footprint
+  const carrySpread = highs.carryDistance - lows.carryDistance;
+  const offlineSpread = Math.abs(highs.offline - lows.offline);
+  const footprint = Math.max(1, carrySpread * offlineSpread);
+  
+  if (benchmark) {
+    const areaRatio = footprint / benchmark.landArea;
+    if (areaRatio < 1.2) {
+      report += `- **Tour-Level Tightness**: Your landing footprint of **${footprint.toFixed(0)} sq yards** is remarkably close to the professional standard for a ${club}.\n`;
+    } else if (areaRatio > 2.5) {
+      report += `- **Loose Grouping**: Your dispersion area (**${footprint.toFixed(0)} sq yds**) is over 2.5x the pro target. Focus on centering your strike to shrink this box.\n`;
+    } else {
+      report += `- **Stable Footprint**: Your grouping area is consistent with an advanced amateur profile.\n`;
+    }
   }
 
-  // Spin Logic
-  if (isDriver && averages.spinRate > 3000) {
-    report += "- **Spin is too high**. This is causing a 'ballooning' flight. Check your angle of attack.\n";
-  } else if (isIron && averages.spinRate < 4500 && averages.spinRate > 0) {
-    report += "- **Low Spin Detected**. This may lead to 'fliers' that won't stop on the green.\n";
+  const lateralBias = averages.offline;
+  if (Math.abs(lateralBias) > 10) {
+    report += `- **Spatial Bias**: You are grouping heavily to the **${lateralBias > 0 ? 'Right' : 'Left'}**. This isn't just a miss; it's a repeatable pattern that requires aim compensation or path work.\n`;
   }
 
-  report += "\n[MECHANICAL FIX]\n";
-  if (Math.abs(averages.offline) > 12) {
-    const side = averages.offline > 0 ? "Right" : "Left";
-    report += `- **Lateral Bias**: You are consistently missing **${side}**. Check your face-to-path relationship.\n`;
-    report += `- **Feel Drill**: Try the 'Gate Drill'—place two tees just wider than your clubhead to force a neutral path.\n`;
+  report += "\n[VARIANCE DIAGNOSTICS]\n";
+  const carryVariance = (carrySpread / averages.carryDistance) * 100;
+  
+  report += `- **Vertical Variance**: Your carry distance oscillates by **${carrySpread.toFixed(1)} yards** (${carryVariance.toFixed(1)}%).\n`;
+  
+  if (carryVariance > 10) {
+    report += `- **High Volatility**: The large front-to-back variance suggests "thin" or "heavy" strikes. Consistency here is more important than raw speed.\n`;
   } else {
-    report += "- **Tight Dispersion**: Your face control is excellent. Focus on depth control (speed) rather than direction.\n";
-    report += "- **Drill**: 'Ladder Drill'—try to hit three consecutive shots in 5-yard carry increments.\n";
+    report += `- **Reliable Depth**: Your depth control is excellent. You can trust this yardage for forced carries over hazards.\n`;
+  }
+
+  if (benchmark) {
+    const speedIndex = (averages.ballSpeed / benchmark.ballSpeed) * 100;
+    report += `- **Power Index**: You are generating **${speedIndex.toFixed(1)}%** of the ball speed produced by the average PGA Tour pro with this club.\n`;
   }
 
   return report;
 };
 
 export const analyzeSessionStrategically = (clubStats: ClubStats[]): string => {
-  if (clubStats.length === 0) return "No data to analyze.";
+  if (clubStats.length === 0) return "Upload session data to begin analysis.";
 
-  let report = "[BAG-WIDE DISPERSION]\n";
+  let report = "[BAG-WIDE GROUPINGS]\n";
   
-  // Find Gapping Issues
-  const sortedByDist = [...clubStats].sort((a, b) => b.averages.carryDistance - a.averages.carryDistance);
-  let gapsFound = false;
+  // Find the "Group Leader" (tightest area)
+  const groupings = clubStats.map(s => ({
+    club: s.club,
+    area: (s.highs.carryDistance - s.lows.carryDistance) * Math.abs(s.highs.offline - s.lows.offline)
+  })).sort((a, b) => a.area - b.area);
+
+  const tightest = groupings[0];
+  const widest = groupings[groupings.length - 1];
+
+  report += `- **Consistency Anchor**: Your **${tightest.club}** has the most concentrated grouping in the bag today. This is your "safety" club.\n`;
+  report += `- **Dispersion Outlier**: Your **${widest.club}** is struggling with spatial consistency. Its landing area is the largest in your session.\n`;
+
+  report += "\n[VARIANCE HEATMAP]\n";
   
-  for (let i = 0; i < sortedByDist.length - 1; i++) {
-    const gap = sortedByDist[i].averages.carryDistance - sortedByDist[i+1].averages.carryDistance;
-    if (gap < 6) {
-      report += `- **Gapping Overlap**: Your **${sortedByDist[i].club}** and **${sortedByDist[i+1].club}** are too close (${gap.toFixed(1)}y). Consider removing one.\n`;
-      gapsFound = true;
-    } else if (gap > 18) {
-      report += `- **Distance Hole**: There is a large ${gap.toFixed(1)}y gap between **${sortedByDist[i].club}** and **${sortedByDist[i+1].club}**.\n`;
-      gapsFound = true;
-    }
-  }
+  // Variance logic
+  const volatility = clubStats.map(s => ({
+    club: s.club,
+    v: (s.highs.carryDistance - s.lows.carryDistance) / s.averages.carryDistance
+  })).sort((a, b) => b.v - a.v);
+
+  const mostVolatile = volatility[0];
+
+  report += `- **Variance Leader**: The **${mostVolatile.club}** is showing the highest percentage of yardage volatility (**${(mostVolatile.v * 100).toFixed(1)}%**).\n`;
+  report += `- **Strategic Focus**: Your next practice block should prioritize the **${mostVolatile.club}**. Tightening the variance on this specific club will provide the fastest drop in your handicap.\n`;
   
-  if (!gapsFound) report += "- **Bag Gapping is balanced**. You have consistent 10-12 yard steps between clubs.\n";
-
-  // Macro Pattern
-  const avgOffline = clubStats.reduce((acc, s) => acc + s.averages.offline, 0) / clubStats.length;
-  if (Math.abs(avgOffline) > 5) {
-    report += `- **Macro Pattern**: You have a session-wide **${avgOffline > 0 ? 'Push/Slice' : 'Pull/Hook'}** tendency. This is likely a setup or alignment issue.\n`;
-  }
-
-  report += "\n[STRATEGIC RECOMMENDATIONS]\n";
-  const safest = [...clubStats].sort((a, b) => Math.abs(a.averages.offline) - Math.abs(b.averages.offline))[0];
-  const riskiest = [...clubStats].sort((a, b) => Math.abs(b.averages.offline) - Math.abs(a.averages.offline))[0];
-
-  report += `- **Safest Club**: Your **${safest.club}** is your most reliable 'fairway finder' (avg deviation: ${Math.abs(safest.averages.offline).toFixed(1)}y).\n`;
-  report += `- **Highest Variance**: Your **${riskiest.club}** is currently the most volatile. Avoid using it on tight holes.\n`;
-  report += `- **Tactical Focus**: Focus your next range session on **${riskiest.club}** face control.\n`;
+  const avgSmash = clubStats.reduce((acc, s) => acc + (s.averages.ballSpeed / (s.averages.clubSpeed || 1)), 0) / clubStats.length;
+  report += `- **Ball Striking Efficiency**: Your session-wide Smash Factor is **${avgSmash.toFixed(2)}**. (Tour average: ~1.38 across the bag).\n`;
 
   return report;
 };
