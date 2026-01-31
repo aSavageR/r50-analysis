@@ -9,22 +9,7 @@ import SessionManager from './components/SessionManager';
 import ShotTable from './components/ShotTable';
 import SessionCoach from './components/SessionCoach';
 import ClubDrilldown from './components/ClubDrilldown';
-import { Upload, BarChart3, Database, AlertCircle, LayoutDashboard, BrainCircuit, Table as TableIcon, Key, ExternalLink, ShieldCheck } from 'lucide-react';
-
-// Define the AIStudio interface and extend the global Window object.
-// Using 'interface' allows merging if already defined, and using the named type 
-// matches the expected 'AIStudio' type from the environment.
-// Using 'readonly' for the 'aistudio' property to match global definitions.
-declare global {
-  interface AIStudio {
-    hasSelectedApiKey: () => Promise<boolean>;
-    openSelectKey: () => Promise<void>;
-  }
-
-  interface Window {
-    readonly aistudio: AIStudio;
-  }
-}
+import { Upload, BarChart3, Database, AlertCircle, LayoutDashboard, BrainCircuit, Table as TableIcon } from 'lucide-react';
 
 const parseCSVLine = (line: string, delimiter: string = ','): string[] => {
   const result: string[] = [];
@@ -61,36 +46,6 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'intelligence'>('dashboard');
   const [viewMode, setViewMode] = useState<'clubs' | 'shots'>('clubs');
   const [drilldownClub, setDrilldownClub] = useState<string | null>(null);
-  
-  // Key state
-  const [hasApiKey, setHasApiKey] = useState<boolean>(false);
-  const [isCheckingKey, setIsCheckingKey] = useState(true);
-
-  // Check for API Key on mount
-  useEffect(() => {
-    const checkKey = async () => {
-      // 1. Check if process.env.API_KEY is already present (usually injected by platform)
-      if (process.env.API_KEY && process.env.API_KEY !== "REPLACE_WITH_YOUR_API_KEY") {
-        setHasApiKey(true);
-      } else if (window.aistudio) {
-        // 2. Check if user has previously selected a key via the AI Studio dialog
-        const selected = await window.aistudio.hasSelectedApiKey();
-        setHasApiKey(selected);
-      }
-      setIsCheckingKey(false);
-    };
-    checkKey();
-  }, []);
-
-  const handleConnectKey = async () => {
-    if (window.aistudio) {
-      await window.aistudio.openSelectKey();
-      // Assume success as per platform guidelines and proceed
-      setHasApiKey(true);
-    } else {
-      setError("AI Studio environment not detected. Ensure you are running in a supported container.");
-    }
-  };
 
   useEffect(() => {
     const savedData = localStorage.getItem('garmin_r50_data');
@@ -183,65 +138,6 @@ const App: React.FC = () => {
     [clubStats, drilldownClub]
   );
 
-  if (isCheckingKey) {
-    return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-emerald-500"></div>
-      </div>
-    );
-  }
-
-  // Mandatory Key Selection Screen
-  if (!hasApiKey && activeTab === 'intelligence') {
-    return (
-      <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-10 shadow-2xl text-center space-y-8">
-          <div className="bg-emerald-500/10 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto border border-emerald-500/20">
-            <Key size={40} className="text-emerald-500" />
-          </div>
-          
-          <div className="space-y-3">
-            <h2 className="text-3xl font-black uppercase tracking-tighter">AI Activation Required</h2>
-            <p className="text-zinc-500 text-sm font-medium leading-relaxed">
-              To use the Strategy Lab and individual club coaching, you must connect your Google Gemini API Key.
-            </p>
-          </div>
-
-          <div className="bg-zinc-950 p-6 rounded-2xl border border-zinc-800 text-left space-y-4">
-            <div className="flex items-start gap-3">
-              <ShieldCheck className="text-blue-400 mt-1 shrink-0" size={18} />
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                Your key is stored securely in your browser and is never sent to our servers.
-              </p>
-            </div>
-            <a 
-              href="https://ai.google.dev/gemini-api/docs/billing" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-500 hover:text-emerald-400 transition-colors"
-            >
-              Learn about billing & setup <ExternalLink size={12} />
-            </a>
-          </div>
-
-          <button 
-            onClick={handleConnectKey}
-            className="w-full bg-white hover:bg-emerald-50 text-zinc-950 py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-sm shadow-xl transition-all active:scale-95"
-          >
-            Connect Gemini API
-          </button>
-          
-          <button 
-            onClick={() => setActiveTab('dashboard')}
-            className="text-[10px] font-black uppercase tracking-widest text-zinc-600 hover:text-zinc-400 transition-colors"
-          >
-            Back to Dashboard
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans selection:bg-emerald-500/30 pb-12">
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-6">
@@ -260,7 +156,7 @@ const App: React.FC = () => {
                   onClick={() => setActiveTab('intelligence')}
                   className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'intelligence' ? 'bg-zinc-800 text-white shadow-xl' : 'text-zinc-500 hover:text-zinc-300'}`}
                 >
-                  <BrainCircuit size={14} /> AI Insights
+                  <BrainCircuit size={14} /> Insights
                 </button>
               </div>
             )}
@@ -282,7 +178,7 @@ const App: React.FC = () => {
               )}
               <label className="flex items-center gap-2 bg-zinc-100 hover:bg-white text-zinc-950 px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all cursor-pointer shadow-xl active:scale-95">
                 <Upload size={16} />
-                <span>{isProcessing ? 'Reading...' : 'Ingest CSV'}</span>
+                <span>{isProcessing ? 'Reading...' : 'Upload CSV'}</span>
                 <input type="file" accept=".csv" onChange={handleFileUpload} className="hidden" disabled={isProcessing} />
               </label>
             </div>
@@ -302,9 +198,9 @@ const App: React.FC = () => {
             <div className="bg-zinc-900 p-8 rounded-3xl mb-6 shadow-2xl border border-zinc-800">
               <Database size={56} className="text-emerald-500" />
             </div>
-            <h2 className="text-3xl font-black mb-3 tracking-tighter uppercase">R50 Engine Ready</h2>
+            <h2 className="text-3xl font-black mb-3 tracking-tighter uppercase">R50 Pro Interface</h2>
             <p className="text-zinc-500 text-sm mb-8 max-w-md text-center font-medium leading-relaxed">
-              Upload your Garmin R50 session CSV to unlock club-specific drilldowns, spatial dispersion maps, and AI tactical insights.
+              Upload your Garmin R50 session CSV to unlock club-specific drilldowns, spatial dispersion maps, and PGA-benchmarked insights.
             </p>
             <label className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all cursor-pointer shadow-lg active:scale-95">
               <Upload size={20} />
