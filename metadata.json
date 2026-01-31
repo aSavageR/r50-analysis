@@ -1,0 +1,5 @@
+{
+  "name": "Garmin R50 Golf Analytics",
+  "description": "A minimalist dashboard for analyzing Garmin R50 launch monitor data, featuring club-by-club summaries, shot mapping, and progress tracking over time.",
+  "requestFramePermissions": []
+}
