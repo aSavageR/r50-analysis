@@ -1,8 +1,8 @@
 
-import React, { useMemo, useState, useRef, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Shot } from '../types';
 import { CLUB_COLORS, DEFAULT_COLOR } from '../constants';
-import { Maximize2, X, Target, MousePointer2 } from 'lucide-react';
+import { Maximize2, X, Target } from 'lucide-react';
 
 interface ShotMapProps {
   shots: Shot[];
@@ -56,7 +56,6 @@ const ShotMap: React.FC<ShotMapProps> = ({ shots }) => {
   const displayedShot = hoverShot || activeShot;
 
   const renderTooltip = (shot: Shot) => {
-    // Convert 0-400 SVG coords to 0-100% for absolute positioning
     const top = (scaleY(shot.carryDistance) / height) * 100;
     const left = (scaleX(shot.offline) / width) * 100;
 
@@ -86,7 +85,6 @@ const ShotMap: React.FC<ShotMapProps> = ({ shots }) => {
               </p>
             </div>
           </div>
-          {/* Tooltip Arrow */}
           <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-zinc-950/95 border-r border-b border-white/10 rotate-45"></div>
         </div>
       </div>
@@ -94,11 +92,11 @@ const ShotMap: React.FC<ShotMapProps> = ({ shots }) => {
   };
 
   const renderMapContent = (isLarge: boolean = false) => (
-    <div className="relative w-full h-full">
+    <div className={`relative w-full h-full flex items-center justify-center ${isLarge ? 'p-0' : ''}`}>
       <svg 
         viewBox={`0 0 ${width} ${height}`} 
-        className="w-full h-full object-contain"
-        preserveAspectRatio="xMidYMax meet"
+        className={`w-full h-full transition-all duration-300 ${isLarge ? 'max-w-none max-h-none' : 'max-h-full max-w-full'}`}
+        preserveAspectRatio="xMidYMin meet"
         onClick={() => setActiveShot(null)}
       >
         <defs>
@@ -112,7 +110,7 @@ const ShotMap: React.FC<ShotMapProps> = ({ shots }) => {
           </linearGradient>
         </defs>
 
-        <rect width={width} height={height} fill="url(#turfGradient)" />
+        <rect width={width} height={height} fill="url(#turfGradient)" rx={isLarge ? 0 : 12} />
         
         <path 
           d={`M ${width * 0.2} ${height} Q ${width * 0.3} ${height * 0.5} ${width * 0.4} ${padding} L ${width * 0.6} ${padding} Q ${width * 0.7} ${height * 0.5} ${width * 0.8} ${height} Z`} 
@@ -150,9 +148,7 @@ const ShotMap: React.FC<ShotMapProps> = ({ shots }) => {
               onClick={(e) => handleShotInteraction(e, shot)} 
               className="cursor-pointer group"
             >
-              {/* Larger invisible hit target for easier interaction */}
               <circle cx={cx} cy={cy} r={8} fill="transparent" />
-              
               <circle cx={cx} cy={cy + 0.5} r={isActive || isHovered ? 6 : 3} fill="black" opacity="0.3" />
               <circle
                 cx={cx}
@@ -167,7 +163,6 @@ const ShotMap: React.FC<ShotMapProps> = ({ shots }) => {
           );
         })}
       </svg>
-      
       {displayedShot && renderTooltip(displayedShot)}
     </div>
   );
@@ -184,30 +179,35 @@ const ShotMap: React.FC<ShotMapProps> = ({ shots }) => {
         </button>
       </div>
       
-      <div className="relative bg-emerald-950 rounded-2xl overflow-hidden border border-zinc-950 shadow-inner min-h-[300px]">
+      <div className="relative bg-emerald-950 rounded-2xl overflow-hidden border border-zinc-950 shadow-inner h-[300px]">
         {renderMapContent()}
       </div>
 
       {isExpanded && (
-        <div className="fixed inset-0 z-[100] bg-zinc-950/95 backdrop-blur-2xl flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="relative w-full max-w-4xl h-[90vh] flex flex-col">
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h2 className="text-2xl font-black tracking-tighter uppercase">Range Intelligence</h2>
-                <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em]">Spatial Dispersion Engine</p>
+        <div className="fixed inset-0 z-[100] bg-zinc-950/98 backdrop-blur-2xl flex items-center justify-center p-0 animate-in fade-in duration-300 overflow-hidden">
+          <div className="relative w-full h-full flex flex-col">
+            {/* Header Overlay */}
+            <div className="absolute top-0 left-0 right-0 p-6 z-[110] flex justify-between items-start pointer-events-none">
+              <div className="pointer-events-auto bg-zinc-950/40 backdrop-blur-xl p-6 rounded-3xl border border-white/5">
+                <h2 className="text-2xl md:text-3xl font-black tracking-tighter uppercase">Range Intelligence</h2>
+                <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em]">Full Visual Cluster Audit</p>
               </div>
-              <button onClick={() => setIsExpanded(false)} className="p-3 bg-zinc-900 rounded-2xl hover:bg-rose-500 hover:text-white transition-all">
+              <button 
+                onClick={() => setIsExpanded(false)} 
+                className="pointer-events-auto p-4 bg-zinc-900 rounded-2xl hover:bg-rose-500 hover:text-white transition-all shadow-2xl active:scale-95"
+              >
                 <X size={24} />
               </button>
             </div>
 
-            <div className="flex-1 bg-emerald-950 rounded-[2.5rem] border border-white/5 shadow-2xl relative p-8 overflow-hidden">
+            {/* Main Visual Container */}
+            <div className="flex-1 w-full h-full bg-emerald-950 relative overflow-hidden">
               {renderMapContent(true)}
               
               {/* Legend Overlay */}
-              <div className="absolute bottom-6 inset-x-6 flex flex-wrap gap-2 justify-center pointer-events-none">
+              <div className="absolute bottom-6 inset-x-6 flex flex-wrap gap-2 justify-center z-[110] pointer-events-none">
                 {(Array.from(new Set(shots.map(s => s.club))) as string[]).map(club => (
-                  <div key={club} className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-950/80 backdrop-blur-md rounded-full border border-white/5 shadow-xl">
+                  <div key={club} className="pointer-events-auto flex items-center gap-1.5 px-3 py-1.5 bg-zinc-950/80 backdrop-blur-md rounded-full border border-white/5 shadow-xl">
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: CLUB_COLORS[club] || DEFAULT_COLOR }} />
                     <span className="text-[10px] text-white font-black uppercase tracking-tighter">{club}</span>
                   </div>

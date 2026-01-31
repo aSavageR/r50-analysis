@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
-import { GoogleGenAI } from "@google/genai";
 import { ClubStats } from '../types';
-import { Sparkles, BrainCircuit, Loader2, Target, AlertCircle } from 'lucide-react';
+import { analyzeClubTactically } from '../utils/heuristicCoach';
+import { Sparkles, BrainCircuit, Loader2, Target } from 'lucide-react';
 
 interface ClubCoachProps {
   stats: ClubStats;
@@ -51,61 +51,14 @@ const renderLineWithBold = (text: string) => {
 const ClubCoach: React.FC<ClubCoachProps> = ({ stats }) => {
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const runAnalysis = async () => {
+  const runAnalysis = () => {
     setLoading(true);
-    setError(null);
-    try {
-      // Re-create AI instance right before making an API call
-      const apiKey = process.env.API_KEY;
-      
-      if (!apiKey || apiKey === "REPLACE_WITH_YOUR_API_KEY") {
-        throw new Error("Missing API Key.");
-      }
-
-      const ai = new GoogleGenAI({ apiKey });
-      
-      const clubData = {
-        club: stats.club,
-        averages: stats.averages,
-        consistency: (100 - (stats.highs.carryDistance - stats.lows.carryDistance) / stats.averages.carryDistance * 100).toFixed(0)
-      };
-
-      const prompt = `
-        Role: Technical Golf Coach
-        Context: Analyzing individual performance metrics for ${stats.club} from a Garmin R50.
-        Data: ${JSON.stringify(clubData)}
-
-        Task: Provide a technical "Tactical Intel" report.
-        
-        Structure:
-        [LAUNCH OPTIMIZATION] - Spin, launch, and efficiency audit.
-        [MECHANICAL FIX] - Face/Path assumptions and a specific drill or "feel".
-        
-        Rules: Professional but direct tone, no # headers, use the bracketed tags, bold technical terms.
-      `;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-      });
-
-      if (!response.text) throw new Error("Empty AI response.");
-
-      setAnalysis(response.text);
-    } catch (err: any) {
-      console.error("Club Coach Error:", err);
-      let message = "Engine Error: ";
-      if (err.message?.includes("401") || err.message?.includes("API Key")) {
-        message = "Auth Error. Check Key.";
-      } else {
-        message = err.message || "Failed to connect.";
-      }
-      setError(message);
-    } finally {
+    setTimeout(() => {
+      const result = analyzeClubTactically(stats);
+      setAnalysis(result);
       setLoading(false);
-    }
+    }, 800);
   };
 
   const sections = useMemo(() => {
@@ -117,8 +70,9 @@ const ClubCoach: React.FC<ClubCoachProps> = ({ stats }) => {
       return match ? match[1].trim() : null;
     };
 
-    const s1 = getBlock('LAUNCH OPTIMIZATION', 'MECHANICAL FIX');
-    const s2 = getBlock('MECHANICAL FIX');
+    // Synchronized tags from heuristicCoach.ts
+    const s1 = getBlock('GROUPING & DISPERSION', 'VARIANCE DIAGNOSTICS');
+    const s2 = getBlock('VARIANCE DIAGNOSTICS');
 
     return [s1, s2].filter((s): s is string => !!s);
   }, [analysis]);
@@ -131,8 +85,8 @@ const ClubCoach: React.FC<ClubCoachProps> = ({ stats }) => {
             <BrainCircuit size={18} className="text-blue-400" />
           </div>
           <div>
-            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-100">Tactical Engine</h3>
-            <p className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest mt-0.5">AI Professional Feedback</p>
+            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-100">Performance Logic</h3>
+            <p className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest mt-0.5">PGA Benchmark Analysis</p>
           </div>
         </div>
         <button 
@@ -141,28 +95,22 @@ const ClubCoach: React.FC<ClubCoachProps> = ({ stats }) => {
           className="group relative flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
         >
           {loading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-          <span>{loading ? 'Consulting...' : 'Get AI Intel'}</span>
+          <span>{loading ? 'Processing...' : 'Generate Insights'}</span>
         </button>
       </div>
 
       <div className="p-8">
-        {error && (
-          <div className="flex items-center gap-3 text-rose-400 text-[10px] font-black uppercase tracking-widest bg-rose-500/5 p-4 rounded-xl border border-rose-500/20 mb-4">
-            <AlertCircle size={14} /> {error}
-          </div>
-        )}
-
-        {!analysis && !loading && !error && (
+        {!analysis && !loading && (
           <div className="flex flex-col items-center justify-center py-6 text-zinc-600 gap-3 border border-dashed border-zinc-800 rounded-2xl">
             <Target size={24} className="opacity-20" />
-            <p className="text-[10px] font-black uppercase tracking-widest text-center px-6">Ready to break down your {stats.club} mechanics with AI.</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-center px-6">Click to benchmark your {stats.club} against the pros.</p>
           </div>
         )}
 
         {loading && (
           <div className="flex flex-col items-center justify-center py-10 gap-3">
             <Loader2 size={24} className="animate-spin text-blue-500" />
-            <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Processing Cloud Model...</span>
+            <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Correlating Data Points...</span>
           </div>
         )}
 
@@ -172,7 +120,7 @@ const ClubCoach: React.FC<ClubCoachProps> = ({ stats }) => {
               <div key={idx} className="space-y-4">
                 <div className="flex items-center gap-3">
                   <h4 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] whitespace-nowrap">
-                    {idx === 0 ? 'Performance Analysis' : 'Correction Plan'}
+                    {idx === 0 ? 'Spatial Grouping' : 'Variance Diagnostics'}
                   </h4>
                   <div className="h-px w-full bg-zinc-800/50" />
                 </div>

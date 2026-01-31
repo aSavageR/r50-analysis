@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
-import { GoogleGenAI } from "@google/genai";
 import { Shot, ClubStats } from '../types';
-import { Sparkles, Activity, Loader2, Quote, AlertCircle, Target, Info, BrainCircuit } from 'lucide-react';
+import { analyzeSessionStrategically } from '../utils/heuristicCoach';
+import { Sparkles, Activity, Loader2, Quote, Target, Info, BrainCircuit } from 'lucide-react';
 
 interface SessionCoachProps {
   activeShots: Shot[];
@@ -52,76 +52,14 @@ const renderLineWithBold = (text: string) => {
 const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) => {
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const runAnalysis = async () => {
-    if (activeShots.length < 3) {
-      setError("Strategic analysis requires more data points. Hit more shots to build a profile.");
-      return;
-    }
-
+  const runAnalysis = () => {
     setLoading(true);
-    setError(null);
-
-    try {
-      // Re-create AI instance right before making an API call to ensure 
-      // it always uses the most up-to-date API key from the environment/dialog.
-      const apiKey = process.env.API_KEY;
-      
-      if (!apiKey || apiKey === "REPLACE_WITH_YOUR_API_KEY") {
-        throw new Error("API Key not found. Please click the 'Connect' button or check Vercel settings.");
-      }
-
-      const ai = new GoogleGenAI({ apiKey });
-      
-      const dataSnapshot = clubStats.map(s => ({
-        club: s.club,
-        shots: s.count,
-        avgCarry: s.averages.carryDistance.toFixed(1),
-        avgSpin: s.averages.spinRate.toFixed(0),
-        avgLaunch: s.averages.launchAngle.toFixed(1),
-        avgOffline: s.averages.offline.toFixed(1),
-        dispersion: (s.highs.carryDistance - s.lows.carryDistance).toFixed(1)
-      }));
-
-      const prompt = `
-        Role: PGA Tour Data Analyst
-        Context: Analyzing a full practice session from a Garmin R50 Launch Monitor.
-        Data: ${JSON.stringify(dataSnapshot)}
-
-        Task: Provide a high-level strategic "Bag Audit".
-        
-        Structure:
-        [BAG-WIDE DISPERSION] - Analyze gapping overlaps and overall dispersion trends.
-        [STRATEGIC RECOMMENDATIONS] - Identify the "Reliability Score" for each club group and one tactical range focus.
-        
-        Rules: Professional tone, no # markdown headers, use the bracketed tags above, bold key technical concepts.
-      `;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-      });
-
-      if (!response.text) {
-        throw new Error("The AI model returned an empty response.");
-      }
-
-      setAnalysis(response.text);
-    } catch (err: any) {
-      console.error("Gemini AI Error:", err);
-      let message = "AI Error: ";
-      if (err.message?.includes("401") || err.message?.includes("API Key")) {
-        message += "Authorization issue. Re-connect your key.";
-      } else if (err.message?.includes("403")) {
-        message += "Access Denied. Check API billing/region.";
-      } else {
-        message += err.message || "Unknown error connecting to Gemini.";
-      }
-      setError(message);
-    } finally {
+    setTimeout(() => {
+      const result = analyzeSessionStrategically(clubStats);
+      setAnalysis(result);
       setLoading(false);
-    }
+    }, 1200);
   };
 
   const sections = useMemo(() => {
@@ -132,9 +70,10 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
       return match ? match[1].trim() : null;
     };
 
+    // Synchronized tags from heuristicCoach.ts
     return {
-      diagnostics: getBlock('BAG-WIDE DISPERSION', 'STRATEGIC RECOMMENDATIONS') || analysis,
-      strategy: getBlock('STRATEGIC RECOMMENDATIONS')
+      diagnostics: getBlock('BAG-WIDE GROUPINGS', 'VARIANCE HEATMAP') || analysis,
+      strategy: getBlock('VARIANCE HEATMAP')
     };
   }, [analysis]);
 
@@ -147,8 +86,8 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
               <Target size={20} className="text-emerald-500" />
             </div>
             <div>
-              <h3 className="text-xs font-black uppercase tracking-widest text-zinc-100">AI Intelligence</h3>
-              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">Gemini 3 Flash Engine</p>
+              <h3 className="text-xs font-black uppercase tracking-widest text-zinc-100">Local Intelligence</h3>
+              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">R50 Analytics Core</p>
             </div>
           </div>
 
@@ -168,7 +107,7 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
                <Info size={14} />
              </div>
              <p className="text-[10px] font-medium leading-relaxed text-zinc-500 italic">
-               The Strategy Lab correlates your entire session to find subtle gapping and dispersion faults using advanced generative AI.
+               The Strategy Lab correlates your entire session to find subtle spatial grouping and variance faults using PGA benchmarks.
              </p>
           </div>
         </div>
@@ -199,28 +138,18 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
               className="relative group flex items-center justify-center gap-4 bg-white hover:bg-emerald-50 text-zinc-950 px-12 py-6 rounded-2xl font-black text-sm uppercase tracking-[0.15em] transition-all active:scale-95 disabled:opacity-50 shadow-2xl"
             >
               {loading ? <Loader2 className="animate-spin" size={24} /> : <Sparkles size={24} className="text-emerald-600" />}
-              <span>{loading ? 'Consulting AI...' : 'Deploy Intelligence'}</span>
+              <span>{loading ? 'Analyzing...' : 'Deploy Analytics'}</span>
             </button>
           </div>
 
           <div className="p-10 flex-1">
-            {error && (
-              <div className="flex items-start gap-4 p-6 bg-rose-500/5 border border-rose-500/20 rounded-3xl text-rose-400">
-                <AlertCircle size={20} className="mt-1 flex-shrink-0" />
-                <div className="space-y-1">
-                  <p className="text-sm font-black uppercase tracking-widest">Initialization Error</p>
-                  <p className="text-xs font-medium opacity-80">{error}</p>
-                </div>
-              </div>
-            )}
-
-            {!analysis && !loading && !error && (
+            {!analysis && !loading && (
               <div className="h-full flex flex-col items-center justify-center py-24 text-center">
                 <div className="w-20 h-20 rounded-full border-2 border-dashed border-zinc-800 flex items-center justify-center mb-6">
                    <Activity size={32} className="text-zinc-800" />
                 </div>
                 <h3 className="text-xl font-black uppercase tracking-tight text-zinc-600">Intelligence Standby</h3>
-                <p className="text-sm text-zinc-500 mt-2 font-medium">Click "Deploy Intelligence" to initiate the generative session audit.</p>
+                <p className="text-sm text-zinc-500 mt-2 font-medium">Click "Deploy Analytics" to correlate your bag dispersion patterns.</p>
               </div>
             )}
 
@@ -231,8 +160,8 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
                   <Loader2 className="animate-spin text-emerald-500 relative" size={48} />
                 </div>
                 <div className="text-center">
-                  <span className="text-[10px] font-black uppercase tracking-[0.4em] text-emerald-500 block mb-2">Analyzing Bag Physics</span>
-                  <span className="text-sm text-zinc-500 font-medium italic">Gemini is processing your launch patterns...</span>
+                  <span className="text-[10px] font-black uppercase tracking-[0.4em] text-emerald-500 block mb-2">Calculating Physics</span>
+                  <span className="text-sm text-zinc-500 font-medium italic">Benchmarking against PGA Tour standards...</span>
                 </div>
               </div>
             )}
@@ -242,7 +171,7 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
                 <div className="space-y-8">
                   <div className="flex items-center gap-4">
                     <h3 className="text-[11px] font-black text-emerald-500 uppercase tracking-[0.4em] whitespace-nowrap">
-                      Dispersion Audit
+                      Bag Groupings
                     </h3>
                     <div className="h-px w-full bg-gradient-to-r from-emerald-500/20 to-transparent" />
                   </div>
@@ -255,7 +184,7 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
                 <div className="space-y-8">
                   <div className="flex items-center gap-4">
                     <h3 className="text-[11px] font-black text-blue-400 uppercase tracking-[0.4em] whitespace-nowrap">
-                      Strategic Intel
+                      Variance Heatmap
                     </h3>
                     <div className="h-px w-full bg-gradient-to-r from-blue-500/20 to-transparent" />
                   </div>
