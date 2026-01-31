@@ -2,14 +2,13 @@
 import React, { useState, useMemo } from 'react';
 import { GoogleGenAI } from "@google/genai";
 import { ClubStats } from '../types';
-import { Sparkles, BrainCircuit, Loader2, Target, AlertCircle } from 'lucide-react';
+import { Sparkles, BrainCircuit, Loader2, Target, AlertCircle, ShieldAlert } from 'lucide-react';
 
 interface ClubCoachProps {
   stats: ClubStats;
 }
 
 const FormattedAnalysis: React.FC<{ text: string }> = ({ text }) => {
-  // Clean text and remove headers or bracketed tags the AI might have repeated
   const cleanText = text.replace(/#+/g, '').replace(/\[.*?\]/g, '').trim();
   const lines = cleanText.split('\n').map(l => l.trim()).filter(l => l !== '');
 
@@ -58,11 +57,19 @@ const ClubCoach: React.FC<ClubCoachProps> = ({ stats }) => {
     setLoading(true);
     setError(null);
     try {
-      const apiKey = process.env.API_KEY; 
-      if (!apiKey) throw new Error("API configuration missing.");
+      // Robust key detection for Vercel/Mobile environments
+      let apiKey = '';
+      try {
+        apiKey = process.env.API_KEY || '';
+      } catch (e) {
+        apiKey = (window as any).process?.env?.API_KEY || '';
+      }
 
-      // Always use the required instantiation pattern with named parameter.
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      if (!apiKey) {
+        throw new Error("Missing API_KEY configuration. Ensure it is set in your environment variables.");
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
       
       const clubData = {
         club: stats.club,
@@ -78,11 +85,7 @@ const ClubCoach: React.FC<ClubCoachProps> = ({ stats }) => {
         Analyze ${stats.club} performance. Provide report in TWO parts:
         Part 1: [LAUNCH OPTIMIZATION] - Spin/Launch window efficiency.
         Part 2: [MECHANICAL FIX] - Face/Path faults and a single "feel" or drill.
-        
-        RULES:
-        - NO markdown headers (no #).
-        - Start sections with the bracketed tags ONLY.
-        - Bold keywords with **text**.
+        RULES: No headers, use bracketed tags, bold technical terms with **text**.
       `;
 
       const response = await ai.models.generateContent({
@@ -101,18 +104,12 @@ const ClubCoach: React.FC<ClubCoachProps> = ({ stats }) => {
 
   const sections = useMemo(() => {
     if (!analysis) return [];
-    
     const getBlock = (tag: string, nextTag?: string) => {
       const regex = new RegExp(`\\[?${tag}\\]?([\\s\\S]*?)(?=\\[?${nextTag}\\]?|$)`, 'i');
       const match = analysis.match(regex);
       return match ? match[1].trim() : null;
     };
-
-    const s1 = getBlock('LAUNCH OPTIMIZATION', 'MECHANICAL FIX');
-    const s2 = getBlock('MECHANICAL FIX');
-
-    // Filter out nulls and ensure we have actual content
-    return [s1, s2].filter((s): s is string => s !== null && s.length > 0);
+    return [getBlock('LAUNCH OPTIMIZATION', 'MECHANICAL FIX'), getBlock('MECHANICAL FIX')].filter((s): s is string => !!s);
   }, [analysis]);
 
   return (
@@ -139,12 +136,16 @@ const ClubCoach: React.FC<ClubCoachProps> = ({ stats }) => {
 
       <div className="p-8">
         {error && (
-          <div className="flex items-center gap-3 text-rose-400 text-[10px] font-black uppercase tracking-widest bg-rose-500/5 p-4 rounded-xl border border-rose-500/20 mb-4">
-            <AlertCircle size={14} /> {error}
+          <div className="bg-rose-500/5 border border-rose-500/20 text-rose-400 p-6 rounded-2xl text-[10px] font-black uppercase tracking-widest flex flex-col gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <ShieldAlert size={14} className="text-rose-500" />
+              <span>Config Alert</span>
+            </div>
+            <p className="opacity-70 leading-relaxed font-medium">{error}</p>
           </div>
         )}
 
-        {!analysis && !loading && (
+        {!analysis && !loading && !error && (
           <div className="flex flex-col items-center justify-center py-6 text-zinc-600 gap-3 border border-dashed border-zinc-800 rounded-2xl">
             <Target size={24} className="opacity-20" />
             <p className="text-[10px] font-black uppercase tracking-widest text-center px-6">Ready to break down your {stats.club} mechanics.</p>

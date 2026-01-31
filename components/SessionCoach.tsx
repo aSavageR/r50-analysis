@@ -2,8 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { GoogleGenAI } from "@google/genai";
 import { Shot, ClubStats } from '../types';
-// Added BrainCircuit to the import list below to fix the error on line 182
-import { Sparkles, Activity, Loader2, Quote, AlertCircle, Target, TrendingUp, Info, BrainCircuit } from 'lucide-react';
+import { Sparkles, Activity, Loader2, Quote, AlertCircle, Target, TrendingUp, Info, BrainCircuit, ShieldAlert } from 'lucide-react';
 
 interface SessionCoachProps {
   activeShots: Shot[];
@@ -57,7 +56,7 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
 
   const runAnalysis = async () => {
     if (activeShots.length < 5) {
-      setError("Strategic analysis requires at least 5 shots for a credible bag-wide pattern detection.");
+      setError("Strategic analysis requires at least 5 shots for a pattern detection.");
       return;
     }
 
@@ -65,11 +64,19 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
     setError(null);
 
     try {
-      const apiKey = process.env.API_KEY; 
-      if (!apiKey) throw new Error("API configuration is missing.");
+      // Robust key detection for mobile browsers
+      let apiKey = '';
+      try {
+        apiKey = process.env.API_KEY || '';
+      } catch (e) {
+        apiKey = (window as any).process?.env?.API_KEY || '';
+      }
 
-      // Always use the required instantiation pattern with named parameter.
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      if (!apiKey) {
+        throw new Error("API_KEY is not defined. Please verify that 'API_KEY' is added to your Environment Variables (e.g., in the Vercel Dashboard).");
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
       
       const dataSnapshot = clubStats.map(s => ({
         club: s.club,
@@ -87,17 +94,11 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
         DATA:
         ${JSON.stringify(dataSnapshot, null, 2)}
 
-        TASK:
-        Provide a strategic "Strategy Lab" report in TWO parts:
-        Part 1: [BAG-WIDE DISPERSION] - Identify macro patterns (e.g. "Irons are pulling left", "Spin rates are too high across woods"). Mention gapping issues.
-        Part 2: [STRATEGIC RECOMMENDATIONS] - Identify the "Safest" club in the bag and the "Highest Variance" club. Give one specific tactical focus for the next session.
+        Provide report in TWO parts:
+        Part 1: [BAG-WIDE DISPERSION] - Identify macro patterns across the set.
+        Part 2: [STRATEGIC RECOMMENDATIONS] - Identify safest vs riskiest clubs and tactical focus.
         
-        CONSTRAINTS:
-        - Professional, elite athlete tone.
-        - NO markdown headers (no #).
-        - Use bracketed tags ONLY to separate sections.
-        - Bold key technical findings with **text**.
-        - Use bullet points.
+        RULES: No # headers, use bracketed tags, bold key terms with **text**.
       `;
 
       const response = await ai.models.generateContent({
@@ -108,7 +109,7 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
       setAnalysis(response.text || "Strategic intel unavailable.");
     } catch (err: any) {
       console.error("Strategy Analysis Failure:", err);
-      setError(`Strategy Interrupted: ${err.message || "Unknown Error"}`);
+      setError(err.message || "Unknown error during intelligence deployment.");
     } finally {
       setLoading(false);
     }
@@ -130,7 +131,6 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-      {/* Sidebar - Data Context */}
       <div className="lg:col-span-4 space-y-6">
         <div className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 shadow-2xl">
           <div className="flex items-center gap-3 mb-8">
@@ -149,12 +149,6 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
               <span className="text-lg font-black mono text-emerald-400">{activeShots.length}</span>
             </div>
             <div className="flex justify-between items-center p-4 bg-zinc-950 rounded-2xl border border-zinc-800">
-              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Avg Carry (All)</span>
-              <span className="text-lg font-black mono text-white">
-                {(activeShots.reduce((a, b) => a + b.carryDistance, 0) / (activeShots.length || 1)).toFixed(1)}y
-              </span>
-            </div>
-            <div className="flex justify-between items-center p-4 bg-zinc-950 rounded-2xl border border-zinc-800">
               <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Active Clubs</span>
               <span className="text-lg font-black mono text-blue-400">{clubStats.length}</span>
             </div>
@@ -165,13 +159,12 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
                <Info size={14} className="text-zinc-500" />
              </div>
              <p className="text-[10px] font-medium leading-relaxed text-zinc-500 italic">
-               The Strategy Lab analyzes cross-club correlations, gapping efficiency, and dispersion patterns across your entire bag to provide macro-level technical guidance.
+               The Strategy Lab analyzes cross-club correlations and dispersion patterns to provide technical guidance.
              </p>
           </div>
         </div>
       </div>
 
-      {/* Main Panel - Analysis Results */}
       <div className="lg:col-span-8">
         <div className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] overflow-hidden shadow-2xl relative min-h-[600px] flex flex-col">
           <div className="absolute top-0 right-0 p-12 opacity-[0.03] pointer-events-none">
@@ -188,10 +181,6 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
                   <span className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.5em]">Strategic Deployment</span>
                 </div>
                 <h2 className="text-4xl font-black tracking-tight uppercase">Strategy Lab</h2>
-                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.2em] mt-1.5 flex items-center gap-2">
-                  <TrendingUp size={12} className="text-emerald-500/50" />
-                  Bag Gapping & Dispersion Intelligence
-                </p>
               </div>
             </div>
             
@@ -201,27 +190,27 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
               className="relative group flex items-center justify-center gap-4 bg-white hover:bg-emerald-50 text-zinc-950 px-12 py-6 rounded-2xl font-black text-sm uppercase tracking-[0.15em] transition-all active:scale-95 disabled:opacity-50 shadow-2xl"
             >
               {loading ? <Loader2 className="animate-spin" size={24} /> : <Sparkles size={24} className="text-emerald-600" />}
-              <span>{loading ? 'Processing Session...' : 'Deploy Intelligence'}</span>
+              <span>{loading ? 'Processing...' : 'Deploy Intelligence'}</span>
             </button>
           </div>
 
           <div className="p-10 flex-1">
             {error && (
-              <div className="bg-rose-500/5 border border-rose-500/20 text-rose-400 p-8 rounded-3xl text-sm font-bold flex items-center gap-4 mb-8">
-                <AlertCircle size={24} />
-                {error}
+              <div className="bg-rose-500/5 border border-rose-500/20 text-rose-400 p-8 rounded-3xl text-xs font-bold flex flex-col gap-4 mb-8">
+                <div className="flex items-center gap-3">
+                  <ShieldAlert size={20} className="text-rose-500" />
+                  <span className="uppercase tracking-widest font-black text-[10px]">System Configuration Required</span>
+                </div>
+                <p className="leading-relaxed opacity-80">{error}</p>
               </div>
             )}
             
-            {!analysis && !loading && (
+            {!analysis && !loading && !error && (
               <div className="h-full flex flex-col items-center justify-center py-24 text-center">
                 <div className="w-20 h-20 rounded-full border-2 border-dashed border-zinc-800 flex items-center justify-center mb-6">
                    <Activity size={32} className="text-zinc-800" />
                 </div>
-                <h3 className="text-xl font-black uppercase tracking-tight text-zinc-600 mb-2">Analysis Engine Standby</h3>
-                <p className="text-sm text-zinc-700 max-w-sm font-medium leading-relaxed">
-                  Run the deployment to initiate a multi-vector scan of your bag performance and tactical patterns.
-                </p>
+                <h3 className="text-xl font-black uppercase tracking-tight text-zinc-600">Analysis Engine Standby</h3>
               </div>
             )}
 
@@ -229,18 +218,12 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
               <div className="grid grid-cols-1 md:grid-cols-2 gap-12 py-8">
                 <div className="space-y-6">
                   <div className="h-4 w-48 bg-zinc-800 rounded-full animate-pulse" />
-                  <div className="space-y-3">
-                    <div className="h-3 w-full bg-zinc-800/50 rounded-full animate-pulse" />
-                    <div className="h-3 w-11/12 bg-zinc-800/50 rounded-full animate-pulse" />
-                    <div className="h-3 w-4/5 bg-zinc-800/50 rounded-full animate-pulse" />
-                  </div>
+                  <div className="h-3 w-full bg-zinc-800/50 rounded-full animate-pulse" />
+                  <div className="h-3 w-11/12 bg-zinc-800/50 rounded-full animate-pulse" />
                 </div>
                 <div className="space-y-6">
                   <div className="h-4 w-48 bg-zinc-800 rounded-full animate-pulse" />
-                  <div className="space-y-3">
-                    <div className="h-3 w-full bg-zinc-800/50 rounded-full animate-pulse" />
-                    <div className="h-3 w-5/6 bg-zinc-800/50 rounded-full animate-pulse" />
-                  </div>
+                  <div className="h-3 w-full bg-zinc-800/50 rounded-full animate-pulse" />
                 </div>
               </div>
             )}
@@ -249,9 +232,7 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
               <div className="grid grid-cols-1 md:grid-cols-2 gap-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
                 <div className="space-y-8">
                   <div className="flex items-center gap-4">
-                    <h3 className="text-[11px] font-black text-emerald-500 uppercase tracking-[0.4em] whitespace-nowrap">
-                      Dispersion Audit
-                    </h3>
+                    <h3 className="text-[11px] font-black text-emerald-500 uppercase tracking-[0.4em] whitespace-nowrap">Dispersion Audit</h3>
                     <div className="h-px w-full bg-gradient-to-r from-emerald-500/20 to-transparent" />
                   </div>
                   <div className="bg-zinc-950/40 p-8 rounded-[2.5rem] border border-zinc-800/50 shadow-inner relative overflow-hidden group">
@@ -262,18 +243,12 @@ const SessionCoach: React.FC<SessionCoachProps> = ({ activeShots, clubStats }) =
 
                 <div className="space-y-8">
                   <div className="flex items-center gap-4">
-                    <h3 className="text-[11px] font-black text-blue-400 uppercase tracking-[0.4em] whitespace-nowrap">
-                      Strategy Intel
-                    </h3>
+                    <h3 className="text-[11px] font-black text-blue-400 uppercase tracking-[0.4em] whitespace-nowrap">Strategy Intel</h3>
                     <div className="h-px w-full bg-gradient-to-r from-blue-500/20 to-transparent" />
                   </div>
                   <div className="bg-zinc-950/40 p-8 rounded-[2.5rem] border border-zinc-800/50 shadow-inner relative overflow-hidden group">
                     <div className="absolute top-0 left-0 w-1 h-full bg-blue-500/20" />
-                    {sections.strategy ? (
-                      <FormattedAnalysis text={sections.strategy} />
-                    ) : (
-                      <p className="text-xs text-zinc-500 italic">No strategic data returned for this vector.</p>
-                    )}
+                    {sections.strategy && <FormattedAnalysis text={sections.strategy} />}
                   </div>
                 </div>
               </div>
