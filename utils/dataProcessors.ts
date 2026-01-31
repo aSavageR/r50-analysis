@@ -46,25 +46,20 @@ export const processCsvRows = (rows: any[], sessionId: string): Shot[] => {
       const ballSpeed = parseFloat(row['Ball Speed'] || '0');
       const carryDistance = parseFloat(row['Carry Distance'] || '0');
 
+      // Basic data validity check
       if (!club || isNaN(ballSpeed) || isNaN(carryDistance) || (ballSpeed === 0 && carryDistance === 0)) {
         return null;
       }
 
-      // Base metrics
       const spinRate = parseFloat(row['Spin Rate'] || row['Total Spin'] || '0');
       const spinAxis = parseFloat(row['Spin Axis'] || '0');
       
-      // Check for provided components first
       let backSpin = parseFloat(row['Back Spin'] || '0');
       let sideSpin = parseFloat(row['Side Spin'] || '0');
 
-      // PHYSICS CALCULATION: If components are missing (common in R50 exports) but Axis/Total are present
-      // Spin Component = Total Spin * sin/cos(Axis). Axis is tilt from vertical.
       if (spinRate > 0 && backSpin === 0 && sideSpin === 0) {
         const axisInRadians = (spinAxis * Math.PI) / 180;
-        // Side spin is horizontal component (sine)
         sideSpin = spinRate * Math.sin(axisInRadians);
-        // Back spin is vertical component (cosine)
         backSpin = spinRate * Math.cos(axisInRadians);
       }
 
@@ -93,15 +88,41 @@ export const processCsvRows = (rows: any[], sessionId: string): Shot[] => {
     .filter((shot): shot is Shot => shot !== null);
 };
 
+/**
+ * Enhanced outlier filtering.
+ * Uses a two-stage approach:
+ * 1. Percentile Trim: Removes the bottom 10% and top 5% of shots by carry (highly effective for launch monitor data).
+ * 2. Tight IQR: Uses a 1.0 multiplier (stricter than the standard 1.5) to find the core data cluster.
+ */
 export const filterOutliers = (shots: Shot[]): Shot[] => {
-  if (shots.length < 3) return shots;
-  const values = shots.map(s => s.carryDistance).sort((a, b) => a - b);
-  const q1 = values[Math.floor(values.length / 4)];
+  if (shots.length < 5) return shots;
+
+  // Initial sort by carry distance to identify extreme mishits
+  const sortedByCarry = [...shots].sort((a, b) => a.carryDistance - b.carryDistance);
+  
+  // Stage 1: Aggressive Percentile Trim
+  // Removes bottom 10% (duffs/topped) and top 5% (glitch/wind reads)
+  const start = Math.floor(shots.length * 0.1);
+  const end = Math.ceil(shots.length * 0.95);
+  const trimmed = sortedByCarry.slice(start, end);
+
+  if (trimmed.length < 3) return shots;
+
+  // Stage 2: Tight Interquartile Range (IQR) Filter
+  // Multiplier reduced from 1.5 to 1.0 for a significantly higher removal percentage
+  const values = trimmed.map(s => s.carryDistance).sort((a, b) => a - b);
+  const q1 = values[Math.floor(values.length * 0.25)];
   const q3 = values[Math.floor(values.length * 0.75)];
   const iqr = q3 - q1;
-  const lowerBound = q1 - 1.5 * iqr;
-  const upperBound = q3 + 1.5 * iqr;
-  return shots.filter(s => s.carryDistance >= lowerBound && s.carryDistance <= upperBound);
+  const lowerBound = q1 - 1.0 * iqr;
+  const upperBound = q3 + 1.0 * iqr;
+
+  // Return the data that fits in the tightest cluster, ensuring no total duffs (under 10yds)
+  return trimmed.filter(s => 
+    s.carryDistance >= lowerBound && 
+    s.carryDistance <= upperBound &&
+    s.carryDistance > 10
+  );
 };
 
 export const calculateClubStats = (shots: Shot[]): ClubStats[] => {
