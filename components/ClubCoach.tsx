@@ -2,21 +2,20 @@
 import React, { useState, useMemo } from 'react';
 import { GoogleGenAI } from "@google/genai";
 import { ClubStats } from '../types';
-import { Sparkles, BrainCircuit, Loader2, Target } from 'lucide-react';
+import { Sparkles, BrainCircuit, Loader2, Target, AlertCircle } from 'lucide-react';
 
 interface ClubCoachProps {
   stats: ClubStats;
 }
 
 const FormattedAnalysis: React.FC<{ text: string }> = ({ text }) => {
-  // Strips all markdown hash symbols and trims empty lines
-  const cleanText = text.replace(/#+/g, '').trim();
+  // Clean text and remove headers or bracketed tags the AI might have repeated
+  const cleanText = text.replace(/#+/g, '').replace(/\[.*?\]/g, '').trim();
   const lines = cleanText.split('\n').map(l => l.trim()).filter(l => l !== '');
 
   return (
     <div className="space-y-3.5 text-zinc-300">
       {lines.map((line, i) => {
-        // Handle Bullet Points
         if (line.startsWith('*') || line.startsWith('-') || line.match(/^\d+\./)) {
           const content = line.replace(/^[*-\d.]+\s*/, '');
           return (
@@ -30,7 +29,6 @@ const FormattedAnalysis: React.FC<{ text: string }> = ({ text }) => {
             </div>
           );
         }
-
         return (
           <p key={i} className="text-[13px] leading-relaxed font-medium">
             {renderLineWithBold(line)}
@@ -54,11 +52,16 @@ const renderLineWithBold = (text: string) => {
 const ClubCoach: React.FC<ClubCoachProps> = ({ stats }) => {
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const runAnalysis = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const apiKey = process.env.API_KEY; 
+      if (!apiKey) throw new Error("API configuration missing.");
+
+      const ai = new GoogleGenAI({ apiKey });
       
       const clubData = {
         club: stats.club,
@@ -71,21 +74,14 @@ const ClubCoach: React.FC<ClubCoachProps> = ({ stats }) => {
       };
 
       const prompt = `
-        You are a World-Class Swing Coach. Analyze ${stats.club} performance.
-        
-        DATA:
-        ${JSON.stringify(clubData, null, 2)}
-
-        TASK:
-        Provide analysis in TWO parts using EXACTLY these tags to start each section:
+        Analyze ${stats.club} performance. Provide report in TWO parts:
         Part 1: [LAUNCH OPTIMIZATION] - Spin/Launch window efficiency.
         Part 2: [MECHANICAL FIX] - Face/Path faults and a single "feel" or drill.
         
-        CRITICAL FORMATTING RULES:
-        - NEVER use hash symbols (#) or markdown headers.
-        - Start sections with the bracketed tag ONLY.
-        - Use bolding with **text** for technical terms.
-        - Be highly concise.
+        RULES:
+        - NO markdown headers (no #).
+        - Start sections with the bracketed tags ONLY.
+        - Bold keywords with **text**.
       `;
 
       const response = await ai.models.generateContent({
@@ -94,8 +90,9 @@ const ClubCoach: React.FC<ClubCoachProps> = ({ stats }) => {
       });
 
       setAnalysis(response.text || "Tactical intel unavailable.");
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.error("Club Analysis Failure:", err);
+      setError(err.message || "Consultation interrupted.");
     } finally {
       setLoading(false);
     }
@@ -103,9 +100,18 @@ const ClubCoach: React.FC<ClubCoachProps> = ({ stats }) => {
 
   const sections = useMemo(() => {
     if (!analysis) return [];
-    // Enhanced split that is case-insensitive and handles potential text before the first tag
-    const parts = analysis.split(/\[(?:LAUNCH OPTIMIZATION|MECHANICAL FIX)\]/i).filter(s => s.trim());
-    return parts;
+    
+    const getBlock = (tag: string, nextTag?: string) => {
+      const regex = new RegExp(`\\[?${tag}\\]?([\\s\\S]*?)(?=\\[?${nextTag}\\]?|$)`, 'i');
+      const match = analysis.match(regex);
+      return match ? match[1].trim() : null;
+    };
+
+    const s1 = getBlock('LAUNCH OPTIMIZATION', 'MECHANICAL FIX');
+    const s2 = getBlock('MECHANICAL FIX');
+
+    // Filter out nulls and ensure we have actual content
+    return [s1, s2].filter((s): s is string => s !== null && s.length > 0);
   }, [analysis]);
 
   return (
@@ -123,7 +129,7 @@ const ClubCoach: React.FC<ClubCoachProps> = ({ stats }) => {
         <button 
           onClick={runAnalysis}
           disabled={loading}
-          className="group relative flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-blue-900/20"
+          className="group relative flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
         >
           {loading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
           <span>{loading ? 'Consulting...' : 'Get Tactical Intel'}</span>
@@ -131,19 +137,16 @@ const ClubCoach: React.FC<ClubCoachProps> = ({ stats }) => {
       </div>
 
       <div className="p-8">
-        {!analysis && !loading && (
-          <div className="flex flex-col items-center justify-center py-6 text-zinc-600 gap-3 border border-dashed border-zinc-800 rounded-2xl">
-            <Target size={24} className="opacity-20" />
-            <p className="text-[10px] font-black uppercase tracking-widest text-center px-6">
-              Ready to break down your {stats.club} mechanics.
-            </p>
+        {error && (
+          <div className="flex items-center gap-3 text-rose-400 text-[10px] font-black uppercase tracking-widest bg-rose-500/5 p-4 rounded-xl border border-rose-500/20 mb-4">
+            <AlertCircle size={14} /> {error}
           </div>
         )}
 
-        {loading && (
-          <div className="space-y-4 py-2">
-            <div className="h-2.5 bg-zinc-800 rounded-full w-full animate-pulse" />
-            <div className="h-2.5 bg-zinc-800 rounded-full w-11/12 animate-pulse" />
+        {!analysis && !loading && (
+          <div className="flex flex-col items-center justify-center py-6 text-zinc-600 gap-3 border border-dashed border-zinc-800 rounded-2xl">
+            <Target size={24} className="opacity-20" />
+            <p className="text-[10px] font-black uppercase tracking-widest text-center px-6">Ready to break down your {stats.club} mechanics.</p>
           </div>
         )}
 
@@ -158,7 +161,7 @@ const ClubCoach: React.FC<ClubCoachProps> = ({ stats }) => {
                   <div className="h-px w-full bg-zinc-800/50" />
                 </div>
                 <div className="bg-zinc-950/30 p-6 rounded-2xl border border-zinc-800/40">
-                  <FormattedAnalysis text={section.trim()} />
+                  <FormattedAnalysis text={section} />
                 </div>
               </div>
             ))}
