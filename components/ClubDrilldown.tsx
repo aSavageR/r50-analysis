@@ -1,8 +1,8 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { ClubStats, Shot } from '../types';
 import { METRIC_LABELS, METRIC_UNITS } from '../constants';
-import { ArrowLeft, Activity, TrendingUp, BarChart } from 'lucide-react';
+import { ArrowLeft, Activity, TrendingUp, BarChart, Info } from 'lucide-react';
 import ClubCoach from './ClubCoach';
 
 interface ClubDrilldownProps {
@@ -11,21 +11,49 @@ interface ClubDrilldownProps {
 }
 
 const ClubDrilldown: React.FC<ClubDrilldownProps> = ({ stats, onBack }) => {
-  const metricsToShow = Object.keys(METRIC_LABELS) as (keyof typeof METRIC_LABELS)[];
+  // Metrics to show in the boundaries table
+  const metricsToShow = [
+    'carryDistance', 
+    'ballSpeed', 
+    'clubSpeed', 
+    'smashFactor', 
+    'angleAttack', 
+    'launchAngle', 
+    'spinRate', 
+    'apex', 
+    'offline'
+  ] as (keyof typeof METRIC_LABELS)[];
+
+  const [showConsistencyInfo, setShowConsistencyInfo] = useState(false);
 
   const formatValue = (key: string, value: number) => {
     const isSpin = key.toLowerCase().includes('spin') && !key.toLowerCase().includes('axis');
+    const isSmash = key === 'smashFactor';
+    const isAoA = key === 'angleAttack';
     const absVal = Math.abs(value);
-    const formatted = isSpin ? Math.round(absVal) : absVal.toFixed(1);
+    
+    let formatted;
+    if (isSpin) formatted = Math.round(absVal);
+    else if (isSmash) formatted = absVal.toFixed(2);
+    else formatted = absVal.toFixed(1);
     
     // Directional metrics
-    const lateralMetrics = ['sideSpin', 'spinAxis', 'launchDirection', 'offline', 'totalOffline'];
+    const lateralMetrics = ['sideSpin', 'spinAxis', 'launchDirection', 'offline'];
     if (lateralMetrics.includes(key) && value !== 0) {
       const dir = value > 0 ? 'R' : 'L';
       const color = value > 0 ? 'text-blue-400' : 'text-rose-400';
       return (
         <span className={`${color} font-black`}>
           {dir} {formatted}
+        </span>
+      );
+    }
+
+    if (isAoA && value !== 0) {
+      const color = value > 0 ? 'text-emerald-400' : 'text-rose-400';
+      return (
+        <span className={`${color} font-black`}>
+          {value > 0 ? '↑' : '↓'} {formatted}
         </span>
       );
     }
@@ -55,12 +83,39 @@ const ClubDrilldown: React.FC<ClubDrilldownProps> = ({ stats, onBack }) => {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: 'Avg Carry', value: stats.averages.carryDistance.toFixed(1), unit: 'yd', color: 'text-emerald-400' },
-          { label: 'Avg Ball Speed', value: stats.averages.ballSpeed.toFixed(1), unit: 'mph', color: 'text-blue-400' },
-          { label: 'Avg Spin', value: Math.round(stats.averages.spinRate), unit: 'rpm', color: 'text-zinc-100' },
-          { label: 'Consistency', value: (100 - (stats.highs.carryDistance - stats.lows.carryDistance) / stats.averages.carryDistance * 100).toFixed(0), unit: '%', color: 'text-amber-400' },
+          { label: 'Avg Smash', value: stats.averages.smashFactor.toFixed(2), unit: 'x', color: 'text-amber-400' },
+          { label: 'Avg Attack', value: stats.averages.angleAttack.toFixed(1), unit: '°', color: stats.averages.angleAttack >= 0 ? 'text-emerald-400' : 'text-rose-400' },
+          { 
+            label: 'Consistency', 
+            value: (100 - (stats.highs.carryDistance - stats.lows.carryDistance) / stats.averages.carryDistance * 100).toFixed(0), 
+            unit: '%', 
+            color: 'text-blue-400',
+            hasInfo: true
+          },
         ].map(stat => (
-          <div key={stat.label} className="bg-zinc-900 border border-zinc-800 p-5 rounded-3xl shadow-sm">
-            <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-1">{stat.label}</p>
+          <div key={stat.label} className="bg-zinc-900 border border-zinc-800 p-5 rounded-3xl shadow-sm relative overflow-visible">
+            <div className="flex items-center gap-1.5 mb-1">
+              <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">{stat.label}</p>
+              {stat.hasInfo && (
+                <div className="relative">
+                  <button 
+                    onMouseEnter={() => setShowConsistencyInfo(true)}
+                    onMouseLeave={() => setShowConsistencyInfo(false)}
+                    className="text-zinc-700 hover:text-emerald-500 transition-colors"
+                  >
+                    <Info size={12} />
+                  </button>
+                  {showConsistencyInfo && (
+                    <div className="absolute z-[100] left-0 top-6 w-56 p-4 bg-zinc-950 border border-zinc-800 rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+                      <p className="text-[10px] text-zinc-100 font-black uppercase tracking-widest mb-2 text-emerald-500">Metric Logic</p>
+                      <p className="text-[10px] text-zinc-400 font-medium leading-relaxed">
+                        Calculated as the inverse of your carry variance across this session. A higher percentage indicates a tighter landing zone and more repeatable distance control.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             <div className="flex items-baseline gap-1">
               <span className={`text-3xl font-black mono ${stat.color}`}>{stat.value}</span>
               <span className="text-[10px] text-zinc-700 font-black uppercase">{stat.unit}</span>
@@ -69,7 +124,6 @@ const ClubDrilldown: React.FC<ClubDrilldownProps> = ({ stats, onBack }) => {
         ))}
       </div>
 
-      {/* Integrated Club Coach */}
       <ClubCoach stats={stats} />
 
       {/* Metric Ranges Summary Table */}
@@ -125,7 +179,6 @@ const ClubDrilldown: React.FC<ClubDrilldownProps> = ({ stats, onBack }) => {
         </div>
       </div>
 
-      {/* Efficiency & Accuracy Quick Panels */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl">
           <div className="flex items-center gap-2 mb-6">
@@ -138,9 +191,9 @@ const ClubDrilldown: React.FC<ClubDrilldownProps> = ({ stats, onBack }) => {
               <span className="text-lg font-black mono text-zinc-100">{stats.averages.launchAngle.toFixed(1)}°</span>
             </div>
             <div className="flex justify-between items-center p-4 bg-zinc-950 rounded-2xl border border-zinc-800">
-              <span className="text-[10px] font-black text-zinc-500 uppercase">Avg Spin Axis</span>
-              <span className={`text-lg font-black mono ${stats.averages.spinAxis > 0 ? 'text-blue-400' : stats.averages.spinAxis < 0 ? 'text-rose-400' : 'text-zinc-100'}`}>
-                {stats.averages.spinAxis === 0 ? '0.0' : `${stats.averages.spinAxis > 0 ? 'R' : 'L'} ${Math.abs(stats.averages.spinAxis).toFixed(1)}`}°
+              <span className="text-[10px] font-black text-zinc-500 uppercase">Avg Attack Angle</span>
+              <span className={`text-lg font-black mono ${stats.averages.angleAttack > 0 ? 'text-emerald-400' : stats.averages.angleAttack < 0 ? 'text-rose-400' : 'text-zinc-100'}`}>
+                {stats.averages.angleAttack.toFixed(1)}°
               </span>
             </div>
           </div>
@@ -157,9 +210,9 @@ const ClubDrilldown: React.FC<ClubDrilldownProps> = ({ stats, onBack }) => {
               <span className="text-lg font-black mono text-emerald-400">±{(stats.highs.carryDistance - stats.lows.carryDistance).toFixed(1)}y</span>
             </div>
             <div className="flex justify-between items-center p-4 bg-zinc-950 rounded-2xl border border-zinc-800">
-              <span className="text-[10px] font-black text-zinc-500 uppercase">Side Deviation</span>
-              <span className={`text-lg font-black mono ${stats.averages.totalOffline > 0 ? 'text-blue-400' : stats.averages.totalOffline < 0 ? 'text-rose-400' : 'text-zinc-100'}`}>
-                {stats.averages.totalOffline === 0 ? '0.0' : `${stats.averages.totalOffline > 0 ? 'R' : 'L'} ${Math.abs(stats.averages.totalOffline).toFixed(1)}`}y
+              <span className="text-[10px] font-black text-zinc-500 uppercase">Lateral Deviation</span>
+              <span className={`text-lg font-black mono ${stats.averages.offline > 0 ? 'text-blue-400' : stats.averages.offline < 0 ? 'text-rose-400' : 'text-zinc-100'}`}>
+                {stats.averages.offline === 0 ? '0.0' : `${stats.averages.offline > 0 ? 'R' : 'L'} ${Math.abs(stats.averages.offline).toFixed(1)}`}y
               </span>
             </div>
           </div>
