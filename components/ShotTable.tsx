@@ -65,11 +65,11 @@ const ShotTable: React.FC<ShotTableProps> = ({ shots }) => {
               <th className="px-4 py-3 cursor-pointer hover:text-white transition-colors text-right" onClick={() => toggleSort('carryDistance')}>
                 <div className="flex items-center justify-end gap-1">Carry <SortIcon column="carryDistance" /></div>
               </th>
-              <th className="px-4 py-3 cursor-pointer hover:text-white transition-colors text-right" onClick={() => toggleSort('spinRate')}>
-                <div className="flex items-center justify-end gap-1">Total Spin <SortIcon column="spinRate" /></div>
+              <th className="px-4 py-3 cursor-pointer hover:text-white transition-colors text-right" onClick={() => toggleSort('ballSpeed')}>
+                <div className="flex items-center justify-end gap-1">Speed <SortIcon column="ballSpeed" /></div>
               </th>
-              <th className="px-4 py-3 cursor-pointer hover:text-white transition-colors text-right" onClick={() => toggleSort('sideSpin')}>
-                <div className="flex items-center justify-end gap-1">Side Spin <SortIcon column="sideSpin" /></div>
+              <th className="px-4 py-3 cursor-pointer hover:text-white transition-colors text-right" onClick={() => toggleSort('spinRate')}>
+                <div className="flex items-center justify-end gap-1">Spin <SortIcon column="spinRate" /></div>
               </th>
               <th className="px-4 py-3 cursor-pointer hover:text-white transition-colors text-right" onClick={() => toggleSort('offline')}>
                 <div className="flex items-center justify-end gap-1">Offline <SortIcon column="offline" /></div>
@@ -93,12 +93,10 @@ const ShotTable: React.FC<ShotTableProps> = ({ shots }) => {
                   <span className="text-[9px] text-zinc-600 ml-1 font-bold">Y</span>
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <span className="mono font-medium text-zinc-400 text-sm">{Math.round(shot.spinRate)}</span>
+                  <span className="mono font-medium text-zinc-300 text-sm">{shot.ballSpeed.toFixed(1)}</span>
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <span className={`mono text-xs font-bold ${shot.sideSpin > 0 ? 'text-blue-400' : shot.sideSpin < 0 ? 'text-rose-400' : 'text-zinc-500'}`}>
-                    {shot.sideSpin === 0 ? '0' : `${shot.sideSpin > 0 ? 'R' : 'L'} ${Math.round(Math.abs(shot.sideSpin))}`}
-                  </span>
+                  <span className="mono font-medium text-zinc-400 text-sm">{Math.round(shot.spinRate)}</span>
                 </td>
                 <td className="px-4 py-3 text-right">
                   <span className={`mono text-xs font-bold ${shot.offline > 0 ? 'text-blue-400' : shot.offline < 0 ? 'text-rose-400' : 'text-zinc-500'}`}>
