@@ -38,29 +38,35 @@ const parseDate = (dateStr: string): string => {
   return !isNaN(fallback.getTime()) ? fallback.toISOString() : new Date().toISOString();
 };
 
+/**
+ * Robustly find a value from multiple possible header variations
+ */
+const getRowValue = (row: any, keys: string[]): string => {
+  for (const key of keys) {
+    if (row[key] !== undefined && row[key] !== null && row[key] !== '') {
+      return row[key];
+    }
+  }
+  return '0';
+};
+
 export const processCsvRows = (rows: any[], sessionId: string): Shot[] => {
   return rows
     .map((row, index) => {
-      const clubValue = row['Club Type'] || row['Club Name'];
-      const club = clubValue ? normalizeClub(clubValue) : undefined;
-      const ballSpeed = parseFloat(row['Ball Speed'] || '0');
-      const carryDistance = parseFloat(row['Carry Distance'] || '0');
+      const clubValue = getRowValue(row, ['Club Type', 'Club Name']);
+      const club = clubValue !== '0' ? normalizeClub(clubValue) : undefined;
+      const ballSpeed = parseFloat(getRowValue(row, ['Ball Speed']));
+      const carryDistance = parseFloat(getRowValue(row, ['Carry Distance']));
 
-      /**
-       * PHYSICAL SANITY FILTER:
-       * 1. Must have a valid club.
-       * 2. Carry distance must be >= 10 yards. 0-yard shots are usually failed sensor reads or total duffs.
-       * 3. Ball speed must be >= 20 mph. Practice swings or chips shouldn't skew full-swing analytics.
-       */
       if (!club || isNaN(ballSpeed) || isNaN(carryDistance) || carryDistance < 10 || ballSpeed < 20) {
         return null;
       }
 
-      const spinRate = parseFloat(row['Spin Rate'] || row['Total Spin'] || '0');
-      const spinAxis = parseFloat(row['Spin Axis'] || '0');
+      const spinRate = parseFloat(getRowValue(row, ['Spin Rate', 'Total Spin']));
+      const spinAxis = parseFloat(getRowValue(row, ['Spin Axis']));
       
-      let backSpin = parseFloat(row['Back Spin'] || '0');
-      let sideSpin = parseFloat(row['Side Spin'] || '0');
+      let backSpin = parseFloat(getRowValue(row, ['Back Spin']));
+      let sideSpin = parseFloat(getRowValue(row, ['Side Spin']));
 
       if (spinRate > 0 && backSpin === 0 && sideSpin === 0) {
         const axisInRadians = (spinAxis * Math.PI) / 180;
@@ -70,55 +76,40 @@ export const processCsvRows = (rows: any[], sessionId: string): Shot[] => {
 
       return {
         id: `${sessionId}-${index}`,
-        timestamp: parseDate(row['Date']),
+        timestamp: parseDate(getRowValue(row, ['Date'])),
         club: club,
         ballSpeed,
-        clubSpeed: parseFloat(row['Club Speed'] || '0'),
-        smashFactor: parseFloat(row['Smash Factor'] || '0'),
+        clubSpeed: parseFloat(getRowValue(row, ['Club Speed'])),
+        smashFactor: parseFloat(getRowValue(row, ['Smash Factor'])),
         carryDistance,
-        totalDistance: parseFloat(row['Total Distance'] || '0'),
-        launchAngle: parseFloat(row['Launch Angle'] || '0'),
-        launchDirection: parseFloat(row['Launch Direction'] || '0'),
+        totalDistance: parseFloat(getRowValue(row, ['Total Distance'])),
+        launchAngle: parseFloat(getRowValue(row, ['Launch Angle'])),
+        launchDirection: parseFloat(getRowValue(row, ['Launch Direction'])),
         spinRate,
         backSpin,
         sideSpin,
         spinAxis,
-        apex: parseFloat(row['Apex Height'] || '0'),
-        descentAngle: parseFloat(row['Descent Angle'] || '0'),
-        offline: parseFloat(row['Carry Deviation Distance'] || row['Horizontal Carry'] || '0'),
-        totalOffline: parseFloat(row['Total Deviation Distance'] || row['Horizontal Total'] || '0'),
+        apex: parseFloat(getRowValue(row, ['Apex Height'])),
+        // R50 CSVs can use different casing or naming for Angle of Attack
+        angleAttack: parseFloat(getRowValue(row, ['Angle of Attack', 'Attack Angle', 'AngleOfAttack', 'AoA'])),
+        offline: parseFloat(getRowValue(row, ['Carry Deviation Distance', 'Horizontal Carry'])),
+        totalOffline: parseFloat(getRowValue(row, ['Total Deviation Distance', 'Horizontal Total'])),
         sessionId,
       };
     })
     .filter((shot): shot is Shot => shot !== null);
 };
 
-/**
- * ULTRA-AGGRESSIVE OUTLIER FILTERING:
- * Designed to find the 'True Cluster' of a golfer's strike.
- */
 export const filterOutliers = (shots: Shot[]): Shot[] => {
   if (shots.length < 4) return shots;
 
-  // Initial sort by carry distance to identify extreme mishits
   const sortedByCarry = [...shots].sort((a, b) => a.carryDistance - b.carryDistance);
-  
-  /**
-   * STAGE 1: Broad Percentile Trim (Aggressive)
-   * We remove the bottom 15% (duffs/topped) and top 10% (glitch/fliers).
-   * This removes a total of 25% of data before the core calculation.
-   */
   const start = Math.floor(shots.length * 0.15);
   const end = Math.ceil(shots.length * 0.90);
   const trimmed = sortedByCarry.slice(start, end);
 
   if (trimmed.length < 2) return shots;
 
-  /**
-   * STAGE 2: Ultra-Tight Interquartile Range (IQR) Filter
-   * Multiplier reduced to 0.75x. This is extremely strict and will only keep 
-   * shots that are very close to the median performance.
-   */
   const values = trimmed.map(s => s.carryDistance).sort((a, b) => a - b);
   const q1 = values[Math.floor(values.length * 0.25)];
   const q3 = values[Math.floor(values.length * 0.75)];
@@ -141,9 +132,9 @@ export const calculateClubStats = (shots: Shot[]): ClubStats[] => {
     const count = filteredShots.length;
 
     const metrics: (keyof ShotStats)[] = [
-      'ballSpeed', 'clubSpeed', 'carryDistance', 'totalDistance', 
+      'ballSpeed', 'clubSpeed', 'smashFactor', 'carryDistance', 'totalDistance', 
       'launchAngle', 'spinRate', 'backSpin', 'sideSpin', 'spinAxis', 
-      'apex', 'descentAngle', 'offline', 'totalOffline'
+      'apex', 'angleAttack', 'offline', 'totalOffline'
     ];
 
     const averages: any = {};
