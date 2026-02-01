@@ -22,11 +22,12 @@ export const DEFAULT_COLOR = '#475569';
 
 export const METRIC_LABELS: Record<string, string> = {
   carryDistance: 'Carry',
-  totalDistance: 'Total',
+  totalDistance: 'TOTAL',
   ballSpeed: 'Ball Speed',
   clubSpeed: 'Club Speed',
   smashFactor: 'Smash',
   launchAngle: 'Launch',
+  launchDirection: 'L-DIR',
   angleAttack: 'Attack ∠',
   spinRate: 'Spin',
   backSpin: 'Back Spin',
@@ -34,6 +35,8 @@ export const METRIC_LABELS: Record<string, string> = {
   spinAxis: 'Spin Axis',
   apex: 'Apex',
   offline: 'Offline',
+  clubPath: 'PATH',
+  clubFace: 'FACE',
 };
 
 export const METRIC_UNITS: Record<string, string> = {
@@ -43,6 +46,7 @@ export const METRIC_UNITS: Record<string, string> = {
   clubSpeed: 'mph',
   smashFactor: '',
   launchAngle: '°',
+  launchDirection: '°',
   angleAttack: '°',
   spinRate: 'rpm',
   backSpin: 'rpm',
@@ -50,4 +54,6 @@ export const METRIC_UNITS: Record<string, string> = {
   spinAxis: '°',
   apex: 'ft',
   offline: 'yd',
+  clubPath: '°',
+  clubFace: '°',
 };
