@@ -42,31 +42,51 @@ const parseDate = (dateStr: string): string => {
  * Robustly find a value from multiple possible header variations
  */
 const getRowValue = (row: any, keys: string[]): string => {
+  const rowKeys = Object.keys(row);
+  
+  // Direct match check
   for (const key of keys) {
     if (row[key] !== undefined && row[key] !== null && row[key] !== '') {
-      return row[key];
+      return row[key].toString();
     }
   }
+
+  // Fuzzy match (lowercase, no whitespace)
+  const normalizedKeys = keys.map(k => k.toLowerCase().replace(/[\s_]/g, ''));
+  for (const rKey of rowKeys) {
+    const normalizedRKey = rKey.toLowerCase().replace(/[\s_]/g, '');
+    if (normalizedKeys.includes(normalizedRKey)) {
+      if (row[rKey] !== undefined && row[rKey] !== null && row[rKey] !== '') {
+        return row[rKey].toString();
+      }
+    }
+  }
+
   return '0';
+};
+
+const safeParse = (val: string): number => {
+  const parsed = parseFloat(val);
+  return isNaN(parsed) ? 0 : parsed;
 };
 
 export const processCsvRows = (rows: any[], sessionId: string): Shot[] => {
   return rows
     .map((row, index) => {
-      const clubValue = getRowValue(row, ['Club Type', 'Club Name']);
+      const clubValue = getRowValue(row, ['Club Type', 'Club Name', 'Club']);
       const club = clubValue !== '0' ? normalizeClub(clubValue) : undefined;
-      const ballSpeed = parseFloat(getRowValue(row, ['Ball Speed']));
-      const carryDistance = parseFloat(getRowValue(row, ['Carry Distance']));
+      const ballSpeed = safeParse(getRowValue(row, ['Ball Speed']));
+      const carryDistance = safeParse(getRowValue(row, ['Carry Distance']));
 
-      if (!club || isNaN(ballSpeed) || isNaN(carryDistance) || carryDistance < 10 || ballSpeed < 20) {
+      if (!club || isNaN(ballSpeed) || isNaN(carryDistance) || carryDistance < 5 || ballSpeed < 10) {
         return null;
       }
 
-      const spinRate = parseFloat(getRowValue(row, ['Spin Rate', 'Total Spin']));
-      const spinAxis = parseFloat(getRowValue(row, ['Spin Axis']));
+      const spinRate = safeParse(getRowValue(row, ['Spin Rate', 'Total Spin', 'Spin']));
+      const spinAxis = safeParse(getRowValue(row, ['Spin Axis']));
       
-      let backSpin = parseFloat(getRowValue(row, ['Back Spin']));
-      let sideSpin = parseFloat(getRowValue(row, ['Side Spin']));
+      let backSpin = safeParse(getRowValue(row, ['Back Spin']));
+      let sideSpin = safeParse(getRowValue(row, ['Side Spin']));
 
       if (spinRate > 0 && backSpin === 0 && sideSpin === 0) {
         const axisInRadians = (spinAxis * Math.PI) / 180;
@@ -79,19 +99,19 @@ export const processCsvRows = (rows: any[], sessionId: string): Shot[] => {
         timestamp: parseDate(getRowValue(row, ['Date'])),
         club: club,
         ballSpeed,
-        clubSpeed: parseFloat(getRowValue(row, ['Club Speed'])),
-        smashFactor: parseFloat(getRowValue(row, ['Smash Factor'])),
+        clubSpeed: safeParse(getRowValue(row, ['Club Speed'])),
+        smashFactor: safeParse(getRowValue(row, ['Smash Factor', 'Smash'])),
         carryDistance,
-        totalDistance: parseFloat(getRowValue(row, ['Total Distance'])),
-        launchAngle: parseFloat(getRowValue(row, ['Launch Angle'])),
-        launchDirection: parseFloat(getRowValue(row, ['Launch Direction'])),
+        totalDistance: safeParse(getRowValue(row, ['Total Distance'])),
+        launchAngle: safeParse(getRowValue(row, ['Launch Angle', 'Launch V'])),
+        launchDirection: safeParse(getRowValue(row, ['Launch Direction', 'Launch H'])),
         spinRate,
         backSpin,
         sideSpin,
         spinAxis,
-        apex: parseFloat(getRowValue(row, ['Apex Height'])),
-        angleAttack: parseFloat(getRowValue(row, ['Angle of Attack', 'Attack Angle', 'AngleOfAttack', 'AoA'])),
-        offline: parseFloat(getRowValue(row, ['Carry Deviation Distance', 'Horizontal Carry'])),
+        apex: safeParse(getRowValue(row, ['Apex Height', 'Apex'])),
+        angleAttack: safeParse(getRowValue(row, ['Angle of Attack', 'Attack Angle', 'AoA'])),
+        offline: safeParse(getRowValue(row, ['Carry Deviation Distance', 'Horizontal Carry', 'Offline Carry'])),
         totalOffline: 0,
         sessionId,
       };
@@ -103,8 +123,8 @@ export const filterOutliers = (shots: Shot[]): Shot[] => {
   if (shots.length < 4) return shots;
 
   const sortedByCarry = [...shots].sort((a, b) => a.carryDistance - b.carryDistance);
-  const start = Math.floor(shots.length * 0.15);
-  const end = Math.ceil(shots.length * 0.90);
+  const start = Math.floor(shots.length * 0.1);
+  const end = Math.ceil(shots.length * 0.9);
   const trimmed = sortedByCarry.slice(start, end);
 
   if (trimmed.length < 2) return shots;
@@ -113,8 +133,8 @@ export const filterOutliers = (shots: Shot[]): Shot[] => {
   const q1 = values[Math.floor(values.length * 0.25)];
   const q3 = values[Math.floor(values.length * 0.75)];
   const iqr = q3 - q1;
-  const lowerBound = q1 - 0.75 * iqr;
-  const upperBound = q3 + 0.75 * iqr;
+  const lowerBound = q1 - 1.5 * iqr;
+  const upperBound = q3 + 1.5 * iqr;
 
   return trimmed.filter(s => 
     s.carryDistance >= lowerBound && 
