@@ -90,10 +90,9 @@ export const processCsvRows = (rows: any[], sessionId: string): Shot[] => {
         sideSpin,
         spinAxis,
         apex: parseFloat(getRowValue(row, ['Apex Height'])),
-        // R50 CSVs can use different casing or naming for Angle of Attack
         angleAttack: parseFloat(getRowValue(row, ['Angle of Attack', 'Attack Angle', 'AngleOfAttack', 'AoA'])),
         offline: parseFloat(getRowValue(row, ['Carry Deviation Distance', 'Horizontal Carry'])),
-        totalOffline: parseFloat(getRowValue(row, ['Total Deviation Distance', 'Horizontal Total'])),
+        totalOffline: 0,
         sessionId,
       };
     })
@@ -134,7 +133,7 @@ export const calculateClubStats = (shots: Shot[]): ClubStats[] => {
     const metrics: (keyof ShotStats)[] = [
       'ballSpeed', 'clubSpeed', 'smashFactor', 'carryDistance', 'totalDistance', 
       'launchAngle', 'spinRate', 'backSpin', 'sideSpin', 'spinAxis', 
-      'apex', 'angleAttack', 'offline', 'totalOffline'
+      'apex', 'angleAttack', 'offline'
     ];
 
     const averages: any = {};
