@@ -26,7 +26,7 @@ const ClubSummary: React.FC<ClubSummaryProps> = ({ stats, onDrilldown }) => {
       <div className="flex justify-between items-start mb-6">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-3">
-            <div className="w-4 h-4 rounded-full shadow-[0_0_12px_rgba(255,255,255,0.2)]" style={{ backgroundColor: stats.color }} />
+            <div className="w-5 h-5 rounded-full shadow-[0_0_12px_rgba(255,255,255,0.2)]" style={{ backgroundColor: stats.color }} />
             <h3 className="text-4xl font-black tracking-tighter uppercase text-white leading-none">{stats.club}</h3>
           </div>
           <div className="inline-flex px-2 py-0.5 bg-zinc-950 rounded-lg border border-zinc-800 self-start mt-1">
@@ -43,7 +43,7 @@ const ClubSummary: React.FC<ClubSummaryProps> = ({ stats, onDrilldown }) => {
       <div className="flex flex-col gap-4 mb-6">
         <div className="bg-zinc-950 p-6 rounded-3xl border border-zinc-800/50 flex flex-col items-center shadow-inner relative overflow-hidden">
           <div className="absolute top-3 left-4 text-[11px] font-black text-zinc-600 uppercase tracking-[0.3em]">CARRY</div>
-          <div className="flex items-baseline gap-2 pt-2">
+          <div className="flex items-baseline gap-2 pt-3">
             <span className="text-7xl font-black mono text-emerald-400 leading-none tracking-tighter">
               {stats.averages.carryDistance.toFixed(0)}
             </span>
@@ -53,7 +53,7 @@ const ClubSummary: React.FC<ClubSummaryProps> = ({ stats, onDrilldown }) => {
         
         <div className="bg-zinc-950 p-6 rounded-3xl border border-zinc-800/50 flex flex-col items-center shadow-inner relative overflow-hidden">
           <div className="absolute top-3 left-4 text-[11px] font-black text-zinc-600 uppercase tracking-[0.3em]">OFFLINE</div>
-          <div className="flex items-baseline gap-2 pt-2">
+          <div className="flex items-baseline gap-2 pt-3">
             <span className={`text-7xl font-black mono leading-none tracking-tighter ${stats.averages.offline === 0 ? 'text-zinc-500' : stats.averages.offline > 0 ? 'text-blue-400' : 'text-rose-400'}`}>
               {stats.averages.offline === 0 ? '0' : `${stats.averages.offline > 0 ? 'R' : 'L'}${Math.abs(stats.averages.offline).toFixed(0)}`}
             </span>
@@ -65,7 +65,7 @@ const ClubSummary: React.FC<ClubSummaryProps> = ({ stats, onDrilldown }) => {
       {/* Secondary Metrics Grid: Ball, Club, Launch, Spin */}
       <div className="grid grid-cols-2 gap-3">
         {secondaryMetrics.map(m => (
-          <div key={m.key} className="bg-zinc-950/50 p-4 rounded-[1.5rem] border border-zinc-800/50 flex flex-col items-center">
+          <div key={m.key} className="bg-zinc-950/50 p-5 rounded-[1.75rem] border border-zinc-800/50 flex flex-col items-center">
             <span className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-1.5">{m.label}</span>
             <div className="flex items-baseline gap-1">
               <span className="text-3xl font-black mono text-zinc-100 leading-none">
