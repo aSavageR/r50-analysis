@@ -15,7 +15,7 @@ export interface Shot {
   sideSpin: number;
   spinAxis: number;
   apex: number;
-  descentAngle: number;
+  angleAttack: number;
   offline: number; // Carry Deviation
   totalOffline: number; // Total Deviation
   sessionId: string;
@@ -34,6 +34,7 @@ export interface ClubStats {
 export interface ShotStats {
   ballSpeed: number;
   clubSpeed: number;
+  smashFactor: number;
   carryDistance: number;
   totalDistance: number;
   launchAngle: number;
@@ -42,7 +43,7 @@ export interface ShotStats {
   sideSpin: number;
   spinAxis: number;
   apex: number;
-  descentAngle: number;
+  angleAttack: number;
   offline: number;
   totalOffline: number;
 }
