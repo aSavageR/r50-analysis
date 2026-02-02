@@ -39,25 +39,31 @@ const parseDate = (dateStr: string): string => {
 };
 
 /**
- * Robustly find a value from multiple possible header variations
+ * Aggressive normalization for fuzzy header matching.
+ * Removes all non-alphanumeric characters and converts to lowercase.
  */
+const normalizeHeader = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+
 const getRowValue = (row: any, keys: string[]): string => {
   const rowKeys = Object.keys(row);
+  const normalizedSearchKeys = keys.map(normalizeHeader);
   
-  // Direct match check
-  for (const key of keys) {
-    if (row[key] !== undefined && row[key] !== null && row[key] !== '') {
-      return row[key].toString();
+  // 1. Exact or normalized exact match
+  for (const rKey of rowKeys) {
+    const normalizedRKey = normalizeHeader(rKey);
+    if (normalizedSearchKeys.includes(normalizedRKey)) {
+      const val = row[rKey];
+      if (val !== undefined && val !== null && val !== '') return val.toString();
     }
   }
 
-  // Fuzzy match (lowercase, no whitespace)
-  const normalizedKeys = keys.map(k => k.toLowerCase().replace(/[\s_]/g, ''));
+  // 2. Partial match (if a header "contains" our search key after normalization)
   for (const rKey of rowKeys) {
-    const normalizedRKey = rKey.toLowerCase().replace(/[\s_]/g, '');
-    if (normalizedKeys.includes(normalizedRKey)) {
-      if (row[rKey] !== undefined && row[rKey] !== null && row[rKey] !== '') {
-        return row[rKey].toString();
+    const normalizedRKey = normalizeHeader(rKey);
+    for (const searchKey of normalizedSearchKeys) {
+      if (normalizedRKey.includes(searchKey) || searchKey.includes(normalizedRKey)) {
+        const val = row[rKey];
+        if (val !== undefined && val !== null && val !== '') return val.toString();
       }
     }
   }
@@ -66,7 +72,10 @@ const getRowValue = (row: any, keys: string[]): string => {
 };
 
 const safeParse = (val: string): number => {
-  const parsed = parseFloat(val);
+  if (!val) return 0;
+  // Removes any non-numeric characters except for the decimal point and negative sign
+  const cleanVal = val.replace(/[^0-9.-]/g, '');
+  const parsed = parseFloat(cleanVal);
   return isNaN(parsed) ? 0 : parsed;
 };
 
@@ -75,18 +84,18 @@ export const processCsvRows = (rows: any[], sessionId: string): Shot[] => {
     .map((row, index) => {
       const clubValue = getRowValue(row, ['Club Type', 'Club Name', 'Club']);
       const club = clubValue !== '0' ? normalizeClub(clubValue) : undefined;
-      const ballSpeed = safeParse(getRowValue(row, ['Ball Speed']));
-      const carryDistance = safeParse(getRowValue(row, ['Carry Distance']));
+      const ballSpeed = safeParse(getRowValue(row, ['Ball Speed', 'VBall', 'BallSpeed']));
+      const carryDistance = safeParse(getRowValue(row, ['Carry Distance', 'CarryDist', 'Carry', 'Carry Distance']));
 
-      if (!club || isNaN(ballSpeed) || isNaN(carryDistance) || carryDistance < 5 || ballSpeed < 10) {
+      if (!club || isNaN(ballSpeed) || isNaN(carryDistance) || (carryDistance < 2 && ballSpeed < 5)) {
         return null;
       }
 
-      const spinRate = safeParse(getRowValue(row, ['Spin Rate', 'Total Spin', 'Spin']));
-      const spinAxis = safeParse(getRowValue(row, ['Spin Axis']));
+      const spinRate = safeParse(getRowValue(row, ['Spin Rate', 'Total Spin', 'Spin', 'TotalSpin']));
+      const spinAxis = safeParse(getRowValue(row, ['Spin Axis', 'SpinAxis']));
       
-      let backSpin = safeParse(getRowValue(row, ['Back Spin']));
-      let sideSpin = safeParse(getRowValue(row, ['Side Spin']));
+      let backSpin = safeParse(getRowValue(row, ['Back Spin', 'BackSpin']));
+      let sideSpin = safeParse(getRowValue(row, ['Side Spin', 'SideSpin']));
 
       if (spinRate > 0 && backSpin === 0 && sideSpin === 0) {
         const axisInRadians = (spinAxis * Math.PI) / 180;
@@ -96,24 +105,26 @@ export const processCsvRows = (rows: any[], sessionId: string): Shot[] => {
 
       return {
         id: `${sessionId}-${index}`,
-        timestamp: parseDate(getRowValue(row, ['Date'])),
+        timestamp: parseDate(getRowValue(row, ['Date', 'Time', 'Timestamp'])),
         club: club,
         ballSpeed,
-        clubSpeed: safeParse(getRowValue(row, ['Club Speed'])),
-        smashFactor: safeParse(getRowValue(row, ['Smash Factor', 'Smash'])),
+        clubSpeed: safeParse(getRowValue(row, ['Club Speed', 'VClub', 'Club Head Speed', 'ClubSpeed'])),
+        smashFactor: safeParse(getRowValue(row, ['Smash Factor', 'Smash Efficiency', 'Smash', 'SmashFactor'])),
         carryDistance,
-        totalDistance: safeParse(getRowValue(row, ['Total Distance'])),
-        launchAngle: safeParse(getRowValue(row, ['Launch Angle', 'Launch V'])),
-        launchDirection: safeParse(getRowValue(row, ['Launch Direction', 'Launch H'])),
+        totalDistance: safeParse(getRowValue(row, ['Total Distance', 'TotalDist', 'Total', 'Total Distance'])),
+        launchAngle: safeParse(getRowValue(row, ['Launch Angle', 'Launch V', 'Vertical Launch', 'LaunchAngle'])),
+        launchDirection: safeParse(getRowValue(row, ['Launch Direction', 'Launch H', 'Horizontal Launch', 'LaunchHoriz', 'Launch Direction', 'Launch Dir'])),
         spinRate,
         backSpin,
         sideSpin,
         spinAxis,
-        apex: safeParse(getRowValue(row, ['Apex Height', 'Apex'])),
-        angleAttack: safeParse(getRowValue(row, ['Angle of Attack', 'Attack Angle', 'AoA'])),
-        offline: safeParse(getRowValue(row, ['Carry Deviation Distance', 'Horizontal Carry', 'Offline Carry'])),
+        apex: safeParse(getRowValue(row, ['Apex Height', 'Apex', 'Max Height', 'ApexHeight'])),
+        angleAttack: safeParse(getRowValue(row, ['Angle of Attack', 'Attack Angle', 'AoA', 'Attack', 'AttackAngle'])),
+        offline: safeParse(getRowValue(row, ['Carry Deviation', 'Horizontal Carry', 'Offline', 'Lateral Carry', 'Offline Carry', 'Carry Deviation Distance'])),
         totalOffline: 0,
         sessionId,
+        clubPath: safeParse(getRowValue(row, ['Club Path', 'Path', 'Swing Path', 'Path Angle', 'Club Path Angle'])),
+        clubFace: safeParse(getRowValue(row, ['Face Angle', 'Club Face', 'Face', 'Face to Target', 'Club Face Angle'])),
       };
     })
     .filter((shot): shot is Shot => shot !== null);
@@ -152,8 +163,8 @@ export const calculateClubStats = (shots: Shot[]): ClubStats[] => {
 
     const metrics: (keyof ShotStats)[] = [
       'ballSpeed', 'clubSpeed', 'smashFactor', 'carryDistance', 'totalDistance', 
-      'launchAngle', 'spinRate', 'backSpin', 'sideSpin', 'spinAxis', 
-      'apex', 'angleAttack', 'offline'
+      'launchAngle', 'launchDirection', 'spinRate', 'backSpin', 'sideSpin', 'spinAxis', 
+      'apex', 'angleAttack', 'offline', 'clubPath', 'clubFace'
     ];
 
     const averages: any = {};
