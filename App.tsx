@@ -89,23 +89,44 @@ const App: React.FC = () => {
         if (uploadedHashes.has(fileHash)) {
           throw new Error("Duplicate CSV detected. This session has already been processed.");
         }
-        const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l !== '');
-        if (lines.length < 3) {
-          throw new Error("Invalid Garmin R50 export. File structure missing headers or data.");
+        
+        const rawLines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l !== '');
+        if (rawLines.length < 2) {
+          throw new Error("Invalid CSV structure.");
         }
-        const headers = parseCSVLine(lines[0]);
-        const dataLines = lines.slice(2);
+
+        // Garmin R50 CSVs often have a title row at index 0. 
+        // We find the header row by searching for keywords.
+        let headerIdx = 0;
+        for (let i = 0; i < Math.min(rawLines.length, 5); i++) {
+          const l = rawLines[i].toLowerCase();
+          if (l.includes('club') || l.includes('speed') || l.includes('carry')) {
+            headerIdx = i;
+            break;
+          }
+        }
+
+        const headers = parseCSVLine(rawLines[headerIdx]);
+        const dataLines = rawLines.slice(headerIdx + 1);
+        
         const rows = dataLines.map(line => {
           const values = parseCSVLine(line);
           const obj: any = {};
-          headers.forEach((header, i) => { if (header) obj[header] = values[i] || ''; });
+          headers.forEach((header, i) => { 
+            if (header) {
+              obj[header] = values[i] !== undefined ? values[i] : '';
+            }
+          });
           return obj;
         });
+
         const sessionId = `session-${Date.now()}`;
         const newShots = processCsvRows(rows, sessionId);
+        
         if (newShots.length === 0) {
-          throw new Error("No valid shot data found in this CSV.");
+          throw new Error("No valid shot data found. Ensure the CSV is a Garmin R50 export.");
         }
+
         setUploadedHashes(prev => new Set([...prev, fileHash]));
         setShots(prev => [...prev, ...newShots]);
         setSelectedSessionIds(prev => {
