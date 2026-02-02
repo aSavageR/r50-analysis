@@ -71,12 +71,18 @@ const getRowValue = (row: any, keys: string[]): string => {
   return '0';
 };
 
+/**
+ * Parses numeric values while handling direction indicators (L/R).
+ * If 'L' is present, the value is treated as negative.
+ */
 const safeParse = (val: string): number => {
   if (!val) return 0;
+  const isLeft = val.toUpperCase().includes('L');
   // Removes any non-numeric characters except for the decimal point and negative sign
   const cleanVal = val.replace(/[^0-9.-]/g, '');
   const parsed = parseFloat(cleanVal);
-  return isNaN(parsed) ? 0 : parsed;
+  if (isNaN(parsed)) return 0;
+  return isLeft ? -Math.abs(parsed) : parsed;
 };
 
 export const processCsvRows = (rows: any[], sessionId: string): Shot[] => {
@@ -84,9 +90,10 @@ export const processCsvRows = (rows: any[], sessionId: string): Shot[] => {
     .map((row, index) => {
       const clubValue = getRowValue(row, ['Club Type', 'Club Name', 'Club']);
       const club = clubValue !== '0' ? normalizeClub(clubValue) : undefined;
-      const ballSpeed = safeParse(getRowValue(row, ['Ball Speed', 'VBall', 'BallSpeed']));
+      const ballSpeed = safeParse(getRowValue(row, ['Ball Speed', 'VBall', 'BallSpeed', 'Ball Velocity']));
       const carryDistance = safeParse(getRowValue(row, ['Carry Distance', 'CarryDist', 'Carry', 'Carry Distance']));
 
+      // If we don't have basic metrics, it's not a valid shot row
       if (!club || isNaN(ballSpeed) || isNaN(carryDistance) || (carryDistance < 2 && ballSpeed < 5)) {
         return null;
       }
@@ -97,6 +104,7 @@ export const processCsvRows = (rows: any[], sessionId: string): Shot[] => {
       let backSpin = safeParse(getRowValue(row, ['Back Spin', 'BackSpin']));
       let sideSpin = safeParse(getRowValue(row, ['Side Spin', 'SideSpin']));
 
+      // If spin rate exists but components are zero, calculate from axis
       if (spinRate > 0 && backSpin === 0 && sideSpin === 0) {
         const axisInRadians = (spinAxis * Math.PI) / 180;
         sideSpin = spinRate * Math.sin(axisInRadians);
@@ -105,20 +113,20 @@ export const processCsvRows = (rows: any[], sessionId: string): Shot[] => {
 
       return {
         id: `${sessionId}-${index}`,
-        timestamp: parseDate(getRowValue(row, ['Date', 'Time', 'Timestamp'])),
+        timestamp: parseDate(getRowValue(row, ['Date', 'Time', 'Timestamp', 'Shot Time'])),
         club: club,
         ballSpeed,
-        clubSpeed: safeParse(getRowValue(row, ['Club Speed', 'VClub', 'Club Head Speed', 'ClubSpeed'])),
-        smashFactor: safeParse(getRowValue(row, ['Smash Factor', 'Smash Efficiency', 'Smash', 'SmashFactor'])),
+        clubSpeed: safeParse(getRowValue(row, ['Club Speed', 'VClub', 'Club Head Speed', 'ClubSpeed', 'Club Velocity'])),
+        smashFactor: safeParse(getRowValue(row, ['Smash Factor', 'Smash Efficiency', 'Smash', 'SmashFactor', 'Efficiency'])),
         carryDistance,
         totalDistance: safeParse(getRowValue(row, ['Total Distance', 'TotalDist', 'Total', 'Total Distance'])),
-        launchAngle: safeParse(getRowValue(row, ['Launch Angle', 'Launch V', 'Vertical Launch', 'LaunchAngle'])),
-        launchDirection: safeParse(getRowValue(row, ['Launch Direction', 'Launch H', 'Horizontal Launch', 'LaunchHoriz', 'Launch Direction', 'Launch Dir'])),
+        launchAngle: safeParse(getRowValue(row, ['Launch Angle', 'Launch V', 'Vertical Launch', 'LaunchAngle', 'Vertical Launch Angle'])),
+        launchDirection: safeParse(getRowValue(row, ['Launch Direction', 'Launch H', 'Horizontal Launch', 'LaunchHoriz', 'Launch Direction', 'Launch Dir', 'Horizontal Launch Angle'])),
         spinRate,
         backSpin,
         sideSpin,
         spinAxis,
-        apex: safeParse(getRowValue(row, ['Apex Height', 'Apex', 'Max Height', 'ApexHeight'])),
+        apex: safeParse(getRowValue(row, ['Apex Height', 'Apex', 'Max Height', 'ApexHeight', 'Height'])),
         angleAttack: safeParse(getRowValue(row, ['Angle of Attack', 'Attack Angle', 'AoA', 'Attack', 'AttackAngle'])),
         offline: safeParse(getRowValue(row, ['Carry Deviation', 'Horizontal Carry', 'Offline', 'Lateral Carry', 'Offline Carry', 'Carry Deviation Distance'])),
         totalOffline: 0,
