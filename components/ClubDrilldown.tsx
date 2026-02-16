@@ -4,6 +4,7 @@ import { ClubStats, Shot } from '../types';
 import { METRIC_LABELS, METRIC_UNITS } from '../constants';
 import { ArrowLeft, Activity, BarChart, Info } from 'lucide-react';
 import ClubCoach from './ClubCoach';
+import TourComparison from './TourComparison';
 
 interface ClubDrilldownProps {
   stats: ClubStats;
@@ -151,6 +152,8 @@ const ClubDrilldown: React.FC<ClubDrilldownProps> = ({ stats, onBack }) => {
         ))}
       </div>
 
+      <TourComparison stats={stats} />
+
       <ClubCoach stats={stats} />
 
       {/* Performance Boundaries Table - Optimized for Mobile */}
@@ -169,9 +172,9 @@ const ClubDrilldown: React.FC<ClubDrilldownProps> = ({ stats, onBack }) => {
             <thead>
               <tr className="bg-zinc-950 text-[8px] text-zinc-600 font-black uppercase tracking-widest border-b border-zinc-800">
                 <th className="px-2 py-2.5 w-[30%]">Metric</th>
-                <th className="px-1 py-2.5 text-right w-[18%]">Min</th>
-                <th className="px-1 py-2.5 text-right text-zinc-300 w-[22%]">Average</th>
-                <th className="px-1 py-2.5 text-right w-[18%]">Max</th>
+                <th className="px-1 py-2.5 text-right w-[18%]">MIN</th>
+                <th className="px-1 py-2.5 text-right text-zinc-300 w-[22%]">AVERAGE</th>
+                <th className="px-1 py-2.5 text-right w-[18%]">MAX</th>
                 <th className="px-1 py-2.5 text-center w-[12%]">U</th>
               </tr>
             </thead>
